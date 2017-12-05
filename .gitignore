@@ -27,7 +27,7 @@ node_modules/
 .DS_Store
 package-lock.json
 package.json
-sl2/
+mslambda/
 
 # Serverless directories
 .serverless

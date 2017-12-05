@@ -18,38 +18,9 @@ MIN_COUNT=1
 #
 data=None
 
-
-#
-#   LOCAL MOCKS
-#
-class S3(object):
-
-
-    def download_file(self,*a):
-        return {'download_file':a}
-
-
-    def upload_file(self,*a):
-        return {'upload_file':a}
-
-
-class TBL(object):
-
-
-    def put_item(self,**a):
-        return {'item':a}
-
-
-
-if __name__ != "__main__":
-    import boto3
-    s3 = boto3.client('s3')
-    table = boto3.resource('dynamodb').Table(TABLE_NAME)
-else:
-    import argparse
-    s3 = S3()
-    table = TBL()
-
+import boto3
+s3 = boto3.client('s3')
+table = boto3.resource('dynamodb').Table(TABLE_NAME)
 
 
 #
@@ -154,10 +125,11 @@ def unq(data):
 #   MAIN
 #
 if __name__ == "__main__":
+    import argparse
     parser=argparse.ArgumentParser(description='RESIZE LOCAL')
-    parser.add_argument('file',help='file name without ext')
+    parser.add_argument('data',help='json string')
     args=parser.parse_args()
-    print("\nRUN RESIZE LOCALLY:\n")
-    print(resize({"file":args.file},None))
+    print("\nRUN RESIZE:\t{}".format(args.data))
+    print(resize(json.loads(args.data),None))
 
 
