@@ -41,8 +41,9 @@ sls invoke -f meanshift -l -d '{"file":"gc7"}'
 - [ ] fetch/preprocess/run real GLAD data from s3
 - [ ] add run details (tile_zxy,dates,thresholds,etc) to db-write
 - [ ] class for location mapping
-    - [ ] lat/lon to tiles zxy
-    - [ ] lat/lon range to list of zxy-s
+    - [ ] latlon to tiles zxy
+    - [ ] latlon range to list of zxy-s
+    - [ ] zxy-ij to latlon
 - [ ] batch meanshift handler
 - [ ] class for reading results
     - [ ] fetch from db
