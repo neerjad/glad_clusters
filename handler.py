@@ -29,7 +29,7 @@ def meanshift(event, context):
 
     body = {
         "event": "{}".format(event),
-        "message": "CLUSTER IMAGE {}".format(len(out)),
+        "message": "FOUND {} CLUSTERS".format(len(out)),
         "output": item_json,
         "shape": shape
     }
@@ -46,7 +46,7 @@ def meanshift(event, context):
 def cluster_data(image_path):
     im=io.imread(image_path)
     ms=MShift(im)
-    out=ms.unq(ms.shiftdata())
+    out=ms.unq(ms.clusters())
     return out.tolist(), out.shape
 
 

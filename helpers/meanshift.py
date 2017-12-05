@@ -1,10 +1,11 @@
+import math
 import numpy as np
 
 DEFAULT_WIDTH=0.15
 DEFAULT_ITERATIONS=25
 INDICES=np.indices((256,256))
 THRESH=100
-MIN_COUNT=1
+MIN_COUNT=4
 
 class MShift(object):
 
@@ -15,12 +16,11 @@ class MShift(object):
 
 
     def clusters(self,iterations=DEFAULT_ITERATIONS):
-        self._clusters=np.copy(self.data)
+        self._clusters=np.delete(self.shiftdata(),2,axis=0).reshape(-1,2)
         for n in range(iterations):
-            if not (n%5): print(n)
             for i, x in enumerate(self._clusters):
                 dist = np.sqrt(((x-self._clusters)**2).sum(1))
-                weight = gaussian(dist, width)
+                weight = self._gaussian(dist, self.width)
                 self._clusters[i] = (np.expand_dims(weight,1)*self._clusters).sum(0) / weight.sum()
         return self._clusters
 
