@@ -37,14 +37,13 @@ sls invoke -f meanshift -l -d '{"file":"gc7"}'
 ---
 ##### WORKPLAN
 
-    - [x] extend old meanshift code to lambda
-    - [ ] fetch/preprocess/run real GLAD data from s3
-    - [ ] add run details (tile_zxy,dates,thresholds,etc) to db-write
-    - [ ] class for location mapping
-        - [ ] lat/lon to tiles zxy
-        - [ ] lat/lon range to list of zxy-s
-    - [ ] batch meanshift handler
-    - [ ] class for reading results
-        - [ ] fetch from db
-        - [ ] produce image,cluster_image,combined_image
-    
+- [x] extend old meanshift code to lambda
+- [ ] fetch/preprocess/run real GLAD data from s3
+- [ ] add run details (tile_zxy,dates,thresholds,etc) to db-write
+- [ ] class for location mapping
+    - [ ] lat/lon to tiles zxy
+    - [ ] lat/lon range to list of zxy-s
+- [ ] batch meanshift handler
+- [ ] class for reading results
+    - [ ] fetch from db
+    - [ ] produce image,cluster_image,combined_image
