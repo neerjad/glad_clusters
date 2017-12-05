@@ -14,6 +14,7 @@ Its important to keep our requirements to a minimum due to restrictions on the s
 
 ---
 RUN LOCAL TESTS:
+
 ```bash
 source deactivate
 python handler.py '{"file":"gc7"}'
@@ -29,5 +30,5 @@ sls deploy -v
 sls deploy function -f resize
 
 # invoke test (with logs)
-sls invoke -f resize -l -d '{"file":"gc7"}'
+sls invoke -f meanshift -l -d '{"file":"gc7"}'
 ```
