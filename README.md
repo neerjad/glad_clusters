@@ -27,7 +27,7 @@ source activate mslambda
 # deploy (verbose)
 sls deploy -v
 # or deploy only the function
-sls deploy function -f resize
+sls deploy function -f meanshift
 
 # invoke test (with logs)
 sls invoke -f meanshift -l -d '{"file":"gc7"}'

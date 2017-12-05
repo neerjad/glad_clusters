@@ -39,11 +39,11 @@ iamRoleStatements:
 # you can add packaging information here
 package:
   exclude:
-    - sl2/**
+    - mslambda/**
 
 functions:
-  resize:
-    handler: handler.resize
+  meanshift:
+    handler: handler.meanshift
 
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
