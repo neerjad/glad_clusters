@@ -30,20 +30,19 @@ iamRoleStatements:
          - "s3:*"
          - "dynamodb:*"
       Resource:
-         - 'arn:aws:s3:::lambda-cluster-dev'
+         - "arn:aws:s3:::lambda-cluster-dev"
 
-# you can define service wide environment variables here
-#  environment:
-#    variable1: value1
 
 # you can add packaging information here
 package:
   exclude:
     - mslambda/**
+    - local_env.py
 
 functions:
   meanshift:
     handler: handler.meanshift
+    environment: ${file(env.yml):${self:custom.stage}}
 
 #    The following are a few example events you can configure
 #    NOTE: Please make sure to change your handler code to work with those events
@@ -97,6 +96,5 @@ plugins:
 custom:
   pythonRequirements:
     dockerizePip: true
-
-
+  stage: "${opt:stage, self:provider.stage}"
 

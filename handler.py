@@ -3,47 +3,78 @@ import json
 import imageio as io
 from helpers.meanshift import MShift
 import boto3
-import datetime
+from datetime import datetime
+import os
+import logger
 
 
 #
-#   AWS CONFIG
+#   PRE-MAIN
 #
-TABLE_NAME='MShiftDEV'
-BUCKET_NAME='lambda-cluster-dev'
-DEFAULT_ZOOM=4
-DEFAULT_WIDTH=15
-DEFAULT_ITERATIONS=25
-DEFAULT_INTENSITY_THRESHOLD=100
-DEFAULT_MIN_COUNT=4
-DEFALUT_WEIGHT_INTENSITY=False
-DEFALUT_DOWNSAMPLE=False
+if __name__ == "__main__":
+    import local_env
+    local_env.export('dev')
 
-s3 = boto3.client('s3')
-table = boto3.resource('dynamodb').Table(TABLE_NAME)
-GLAD_START_DATE='20150101'
-RUN_DATE_STR=datetime.datetime.now().strftime("%Y%m%d")
-TIMESTAMP_STR=datetime.datetime.now().strftime("%Y%m%d::%H:%M:%S")
+
+
+#
+#  ENV/CONFIG
+#
+def _strtoval(string):
+    if string:
+        lc_string=string.lower()
+        if lc_string=='false':
+            return False
+        elif lc_string=='true':
+            return True
+        elif lc_string=='none':
+            return None
+        else:
+            return string
+
+
+TABLE_NAME=os.environ['table']
+BUCKET_NAME=os.environ['bucket']
+RUN_DATE_STR=datetime.now().strftime("%Y%m%d")
+TIMESTAMP_STR=datetime.now().strftime("%Y%m%d::%H:%M:%S")
+TILE_ROOT=_strtoval(os.environ.get('tile_root'))
 REQUEST_DICT={
-    'z': DEFAULT_ZOOM,
-    'start': int(GLAD_START_DATE),
+    'z':int(os.environ['zoom']),
+    'start': int(os.environ['start_date']),
     'end': int(RUN_DATE_STR),
     'timestamp': TIMESTAMP_STR,
-    'width':int(DEFAULT_WIDTH),
-    'intensity_threshold':DEFAULT_INTENSITY_THRESHOLD,
-    'iterations':DEFAULT_ITERATIONS,
-    'weight_by_intensity': DEFALUT_WEIGHT_INTENSITY,
-    'min_count':DEFAULT_MIN_COUNT,
-    'downsample':DEFALUT_DOWNSAMPLE
+    'width':int(os.environ['width']),
+    'intensity_threshold':int(os.environ['intensity_threshold']),
+    'iterations':int(os.environ['iterations']),
+    'weight_by_intensity': _strtoval(os.environ['weight_by_intensity']),
+    'min_count':int(os.environ['min_count']),
+    'downsample':_strtoval(os.environ['downsample'])
 }
+
+
+#
+# AWS CLIENTS
+#
+s3 = boto3.client('s3')
+table = boto3.resource('dynamodb').Table(TABLE_NAME)
+
 
 #
 # PUBLIC METHODS
 #
 def meanshift(event, context):
     file, data=_parse_request(event)
-    download_path=_download_data(file,event.get('bucket',BUCKET_NAME))
-    input_data,clusters=cluster_data(download_path,data)
+    logger.out("DATA {}\n\n".format(data))
+    if TILE_ROOT:
+        print("TODO: load from remote URL")
+        # download_path=_download_data(file,event.get('bucket',BUCKET_NAME))
+        # input_data,clusters=cluster_data(download_path,data)
+    else:
+        bucket=event.get('bucket',BUCKET_NAME)
+        print("DOWNLOAD FROM S3: {}/{}".format(bucket,file))
+        download_path=_download_data(file,bucket)
+        input_data,clusters=cluster_data(download_path,data)
+
     data['input_data']=input_data
     data['clusters']=clusters
     data['nb_clusters']=len(clusters)
@@ -63,6 +94,11 @@ def meanshift(event, context):
 #
 # INTERNAL METHODS
 #
+def _process_glad(start,end,data):
+    # mask by date range
+    # return data
+    pass
+
 
 def _parse_request(request):
     request_dict=dict(REQUEST_DICT,**request)
@@ -89,12 +125,14 @@ def _get_file_path(request):
                 request.get('x'),
                 request.get('y')
             )
-    return '{}.png'.format(name)
+    if TILE_ROOT:
+        name='{}{}'.format(TILE_ROOT,name)
+    return '{}.png'.format(name)    
 
 
 def cluster_data(image_path,params):
     im=io.imread(image_path)
-    ms=MShift(im,params)
+    ms=MShift(im,**params)
     input_data=ms.input_data()
     clusters=ms.clusters()
     return input_data.tolist(), clusters.tolist()
@@ -105,15 +143,17 @@ def save_out(data):
     return data
 
 
+
+
 #
-#   MAIN
+#   POST-MAIN
 #
 if __name__ == "__main__":
     import argparse
     parser=argparse.ArgumentParser(description='CLUSTER LOCAL')
     parser.add_argument('data',help='json string')
     args=parser.parse_args()
-    print("\nRUN CLUSTER:\t{}".format(args.data))
-    print(meanshift(json.loads(args.data),None))
+    logger.out("\nRUN CLUSTER:\t{}".format(args.data))
+    logger.out(meanshift(json.loads(args.data),None))
 
 

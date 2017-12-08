@@ -8,17 +8,22 @@ class MShift(object):
     #
     # PUBLIC METHODS
     #
-    def __init__(self,data,params):
+    def __init__(self,data,
+            width=None,
+            min_count=None,
+            intensity_threshold=None,
+            iterations=None,
+            **kwargs):
         self.data=data
-        self.width=params['width']/100.0
-        self.min_count=params['min_count']
-        self.threshold=params['intensity_threshold']
-        self.iterations=params['iterations']
+        self.width=width/100.0
+        self.min_count=min_count
+        self.threshold=intensity_threshold
+        self.iterations=iterations
         self._init_properties()
 
 
     def input_data(self):
-        if self._input_data is None:   
+        if self._input_data is None:
             ijimage=np.apply_along_axis(self._ijdata,0,INDICES)
             ij_rows=ijimage.reshape(3,-1)
             zeros=np.all(np.equal(ij_rows, 0),axis=0)
