@@ -59,14 +59,12 @@ def meanshift(event, context):
     logger.out("DATA {}\n\n".format(data))
     if url:
         print("TODO: load from remote URL: {}/{}".format(url,file))
-        # download_path=_download_data(file,event.get('bucket',BUCKET_NAME))
-        # input_data,clusters=cluster_data(download_path,data)
+        download_path="{}/{}".format(url,file)
     else:
         bucket=event.get('bucket',BUCKET_NAME)
-        print("DOWNLOAD FROM S3: {}/{}".format(bucket,file))
         download_path=_download_data(file,bucket)
-        input_data,clusters=cluster_data(download_path,data)
 
+    input_data,clusters=cluster_data(download_path,data)
     data['input_data']=input_data
     data['clusters']=clusters
     data['nb_clusters']=len(clusters)
