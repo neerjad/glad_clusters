@@ -4,8 +4,8 @@ import imageio as io
 from helpers.meanshift import MShift
 import boto3
 from datetime import datetime
-import os
 import logger
+import env
 
 
 #
@@ -17,38 +17,23 @@ if __name__ == "__main__":
 
 
 
-#
-#  ENV/CONFIG
-#
-def _strtoval(string):
-    if string:
-        lc_string=string.lower()
-        if lc_string=='false':
-            return False
-        elif lc_string=='true':
-            return True
-        elif lc_string=='none':
-            return None
-        else:
-            return string
 
-
-TABLE_NAME=os.environ['table']
-BUCKET_NAME=os.environ['bucket']
+TABLE_NAME=env.get('table')
+BUCKET_NAME=env.get('bucket',default=None)
 RUN_DATE_STR=datetime.now().strftime("%Y%m%d")
 TIMESTAMP_STR=datetime.now().strftime("%Y%m%d::%H:%M:%S")
-TILE_ROOT=_strtoval(os.environ.get('tile_root'))
 REQUEST_DICT={
-    'z':int(os.environ['zoom']),
-    'start': int(os.environ['start_date']),
+    'z': env.int('zoom'),
+    'start': env.int('start_date'),
     'end': int(RUN_DATE_STR),
     'timestamp': TIMESTAMP_STR,
-    'width':int(os.environ['width']),
-    'intensity_threshold':int(os.environ['intensity_threshold']),
-    'iterations':int(os.environ['iterations']),
-    'weight_by_intensity': _strtoval(os.environ['weight_by_intensity']),
-    'min_count':int(os.environ['min_count']),
-    'downsample':_strtoval(os.environ['downsample'])
+    'width': env.int('width'),
+    'intensity_threshold': env.int('intensity_threshold'),
+    'iterations': env.int('intensity_threshold'),
+    'weight_by_intensity': env.bool('weight_by_intensity'),
+    'min_count': env.int('min_count'),
+    'downsample': env.int('downsample'),
+    'url': env.get('url',default=None)
 }
 
 
@@ -65,7 +50,7 @@ table = boto3.resource('dynamodb').Table(TABLE_NAME)
 def meanshift(event, context):
     file, data=_parse_request(event)
     logger.out("DATA {}\n\n".format(data))
-    if TILE_ROOT:
+    if False:
         print("TODO: load from remote URL")
         # download_path=_download_data(file,event.get('bucket',BUCKET_NAME))
         # input_data,clusters=cluster_data(download_path,data)
@@ -125,8 +110,9 @@ def _get_file_path(request):
                 request.get('x'),
                 request.get('y')
             )
-    if TILE_ROOT:
-        name='{}{}'.format(TILE_ROOT,name)
+    base=REQUEST_DICT.get('tile_root')
+    if base:
+        name='{}{}'.format(base,name)
     return '{}.png'.format(name)    
 
 
