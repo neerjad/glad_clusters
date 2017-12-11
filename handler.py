@@ -9,23 +9,30 @@ import env
 
 
 #
-#   PRE-MAIN
+#   MAIN (SETUP)
 #
 if __name__ == "__main__":
     import local_env
-    local_env.export('dev')
+    import argparse
+    parser=argparse.ArgumentParser(description='CLUSTER LOCAL')
+    parser.add_argument('data',help='request data as json string')
+    parser.add_argument('-e','--env',default='dev',help='local env name. defaults to dev')
+    args=parser.parse_args()
+    local_env.export(args.env)
 
 
-
-
+#
+#   SETUP
+#
+GLAD_START_DATE_STR='20150101'
 TABLE_NAME=env.get('table')
 BUCKET_NAME=env.get('bucket',default=None)
-RUN_DATE_STR=datetime.now().strftime("%Y%m%d")
+RUN_DATE_INT=int(datetime.now().strftime("%Y%m%d"))
 TIMESTAMP_STR=datetime.now().strftime("%Y%m%d::%H:%M:%S")
 REQUEST_DICT={
     'z': env.int('zoom'),
-    'start': env.int('start_date'),
-    'end': int(RUN_DATE_STR),
+    'start': env.int('start_date',default=GLAD_START_DATE_STR),
+    'end': RUN_DATE_INT,
     'timestamp': TIMESTAMP_STR,
     'width': env.int('width'),
     'intensity_threshold': env.int('intensity_threshold'),
@@ -48,10 +55,10 @@ table = boto3.resource('dynamodb').Table(TABLE_NAME)
 # PUBLIC METHODS
 #
 def meanshift(event, context):
-    file, data=_parse_request(event)
+    file, url, data=_parse_request(event)
     logger.out("DATA {}\n\n".format(data))
-    if False:
-        print("TODO: load from remote URL")
+    if url:
+        print("TODO: load from remote URL: {}/{}".format(url,file))
         # download_path=_download_data(file,event.get('bucket',BUCKET_NAME))
         # input_data,clusters=cluster_data(download_path,data)
     else:
@@ -93,7 +100,7 @@ def _parse_request(request):
             request_dict['start'],
             request_dict['end'],
         )
-    return file, request_dict
+    return file, request_dict.get('url'), request_dict
 
 
 def _download_data(file,bucket):
@@ -132,13 +139,9 @@ def save_out(data):
 
 
 #
-#   POST-MAIN
+#   MAIN (RUN)
 #
 if __name__ == "__main__":
-    import argparse
-    parser=argparse.ArgumentParser(description='CLUSTER LOCAL')
-    parser.add_argument('data',help='json string')
-    args=parser.parse_args()
     logger.out("\nRUN CLUSTER:\t{}".format(args.data))
     logger.out(meanshift(json.loads(args.data),None))
 
