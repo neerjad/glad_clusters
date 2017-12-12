@@ -2,6 +2,10 @@ import math
 import numpy as np
 
 
+WIDTH=15
+MIN_COUNT=6
+INTENSITY_THRESHOLD=100
+ITERATIONS=25
 INDICES=np.indices((256,256))
 
 class MShift(object):
@@ -9,11 +13,10 @@ class MShift(object):
     # PUBLIC METHODS
     #
     def __init__(self,data,
-            width=None,
-            min_count=None,
-            intensity_threshold=None,
-            iterations=None,
-            **kwargs):
+            width=WIDTH,
+            min_count=MIN_COUNT,
+            intensity_threshold=INTENSITY_THRESHOLD,
+            iterations=ITERATIONS):
         self.data=data
         self.width=width/100.0
         self.min_count=min_count

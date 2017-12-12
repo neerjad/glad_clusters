@@ -8,16 +8,37 @@ class AWS(object):
     # PUBLIC METHODS
     #
     def __init__(self,table_name,bucket):
-        self.table_name=table_name
+        self.s3=S3(bucket)
+        self.db=DynamoDB(table_name)
+
+
+
+
+class S3(object):
+    #
+    # PUBLIC METHODS
+    #
+    def __init__(self,bucket):
         self.bucket=bucket
 
-        
-    def s3_download(self,file):
-        self.download_path='{}/{}'.format(S3_DOWNLOAD_FOLDER,file)
-        return s3.download_file(self.bucket,file,download_path)
-         
 
-    def db_put(self,data):
+    def download(self,file):
+        client=boto3.resource(S3)
+        self.download_path='{}/{}'.format(S3_DOWNLOAD_FOLDER,file)
+        return self.client.download_file(self.bucket,file,self.download_path)
+
+
+
+
+class DynamoDB(object):
+    #
+    # PUBLIC METHODS
+    #
+    def __init__(self,table_name):
+        self.table_name=table_name
+
+
+    def put(self,data):
         self.db_data=data
         table=boto3.resource(DYNAMODB).Table(self.table_name)
         return table.put_item(Item=data)
