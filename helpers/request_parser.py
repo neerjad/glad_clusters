@@ -25,36 +25,57 @@ REQUEST_DICT={
 
 
 
-
 class RequestParser(object):
+
+    PROPERTIES=[
+        'file',
+        'date_range',
+        'z',
+        'start',
+        'end',
+        'timestamp',
+        'width',
+        'intensity_threshold',
+        'iterations',
+        'weight_by_intensity',
+        'min_count',
+        'downsample',
+        'url',
+        'table_name']
+
     #
     # PUBLIC METHODS
     #
     def __init__(self,request_dict):
-        self.request_dict=request_dict
-
-def _parse_request(request):
-    request_dict=dict(REQUEST_DICT,**request)
-    file=_get_file_path(request_dict)
-    request_dict['file']=file
-    request_dict['date_range']='{}-{}'.format(
-            request_dict['start'],
-            request_dict['end'],
-        )
-    return file, request_dict.get('url'), request_dict
+        self.request_dict=self._process_request(request_dict)
+        self._update_properties()
 
 
+    def _update_properties(self):
+        for prop in self.PROPERTIES:
+            getattr(self,prop)=self.request_dict.get(prop)
 
-def _get_file_path(request):
-    name=request.get('file')
-    if not name:
-        name='{}/{}/{}'.format(
-                request.get('z'),
-                request.get('x'),
-                request.get('y')
+
+    def _process_request(self,request_dict)
+        request_dict=dict(REQUEST_DICT,**request)
+        request_dict['file']=self._get_file_path(request_dict)
+        request_dict['date_range']='{}-{}'.format(
+                request_dict['start'],
+                request_dict['end'],
             )
-    base=REQUEST_DICT.get('tile_root')
-    if base:
-        name='{}{}'.format(base,name)
-    return '{}.png'.format(name)   
+        return request_dict
+
+
+    def _get_file_path(self,request):
+        name=request.get('file')
+        if not name:
+            name='{}/{}/{}'.format(
+                    request.get('z'),
+                    request.get('x'),
+                    request.get('y')
+                )
+        base=request.get('tile_root')
+        if base:
+            name='{}{}'.format(base,name)
+        return '{}.png'.format(name)   
 
