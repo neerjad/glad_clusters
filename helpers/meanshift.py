@@ -49,13 +49,13 @@ class MShift(object):
 
 
     def clusters(self):
-        xu,count=np.unique(self.clustered_data(),axis=0,return_counts=True)
         points=[]
-        for t,cnt in zip(xu,count): 
-            if cnt>=self.min_count: 
-                points.append(t.tolist())
-        points=np.array(points)
-        return points.astype(int)
+        if len(self.clustered_data()):
+            xu,count=np.unique(self.clustered_data(),axis=0,return_counts=True)
+            for t,cnt in zip(xu,count): 
+                if cnt>=self.min_count: 
+                    points.append(t.tolist())
+        return np.array(points).astype(int)
 
 
     #

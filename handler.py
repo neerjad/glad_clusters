@@ -28,12 +28,12 @@ def meanshift(event, context):
         im_data=GLAD(
             data=im_data,
             start_date=req.start_date,
-            end_date=req.end_date).data()
+            end_date=req.end_date).data
     if req.intensity_threshold:
         im_data=Thresholder(
             data=im_data,
             intensity_threshold=req.intensity_threshold,
-            hard_threshold=req.hard_threshold).data()
+            hard_threshold=req.hard_threshold).data
     # run cluster
     mshift=MShift(
         data=im_data,
