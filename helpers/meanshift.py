@@ -4,9 +4,7 @@ import numpy as np
 
 WIDTH=15
 MIN_COUNT=6
-INTENSITY_THRESHOLD=100
 ITERATIONS=25
-WEIGHT_BY_INTENSITY=False
 DOWNSAMPLE=False
 
 INDICES=np.indices((256,256))
@@ -19,17 +17,13 @@ class MShift(object):
             data,
             width=WIDTH,
             min_count=MIN_COUNT,
-            intensity_threshold=INTENSITY_THRESHOLD,
             iterations=ITERATIONS,
-            weight_by_intensity=WEIGHT_BY_INTENSITY,
             downsample=DOWNSAMPLE):
         self.data=data
         self.width=width/100.0
         self.min_count=min_count
-        self.threshold=intensity_threshold
         self.iterations=iterations
         # TODO: Implement wbi and dsmpl
-        self.weight_by_intensity=weight_by_intensity
         self.downsample=downsample
         self._init_properties()
 
@@ -80,7 +74,7 @@ class MShift(object):
         i=idx[0]
         j=idx[1]
         val=self.data[i,j]
-        if val>self.threshold:
+        if val>0:
             return [i,j,val]
         else:
             return np.zeros(3)

@@ -1,11 +1,18 @@
 from __future__ import print_function
 import json
+import logging
+import imageio as io
 from helpers.meanshift import MShift
 from helpers.request_parser import RequestParser
 from helpers.glad import GLAD
 from helpers.aws import AWS
-import logger
-
+#
+# LOGGING CONFIG
+#
+FORMAT='%(asctime)-15s %(message)s'
+logging.basicConfig(format=FORMAT)
+logger=logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 #
@@ -16,17 +23,21 @@ def meanshift(event, context):
     aws=AWS(req.table_name,req.bucket)
     if not req.url: aws.s3.download(req.file_name,req.data_path)
     # get data
-    im_data=GLAD(req.data_path).data(
+    if req.preprocess_data:
+        im_data=GLAD(
+            data_path=req.data_path,
             start_date=req.start_date,
-            end_date=req.end_date)
+            end_date=req.end_date,
+            intensity_threshold=req.intensity_threshold,
+            hard_threshold=req.hard_threshold).data()
+    else:
+        im_data=io.imread(req.data_path)
     # run cluster
     mshift=MShift(
         im_data,
         width=req.width,
         min_count=req.min_count,
-        intensity_threshold=req.intensity_threshold,
         iterations=req.iterations,
-        weight_by_intensity=req.weight_by_intensity,
         downsample=req.downsample)
     # output
     data=req.data()
@@ -60,7 +71,7 @@ if __name__ == "__main__":
     parser.add_argument('-e','--env',default='dev',help='local env name. defaults to dev')
     args=parser.parse_args()
     local_env.export(args.env)
-    logger.out("\nRUN CLUSTER:\t{}".format(args.data))
-    logger.out(meanshift(json.loads(args.data),None))
+    logger.info("\nRUN CLUSTER:\t{}".format(args.data))
+    logger.info(meanshift(json.loads(args.data),None))
 
 

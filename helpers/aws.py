@@ -24,7 +24,6 @@ class S3(object):
 
     def download(self,file,download_path):
         client=boto3.resource(self.CLIENT_NAME).meta.client
-        print(self.bucket,file,download_path)
         return client.download_file(self.bucket,file,download_path)
 
 

@@ -8,6 +8,9 @@ import re
 DEFAULT_START_DATE=20150101
 DEFAULT_Z=5
 DEFAULT_DOWNLOAD_FOLDER='/tmp'
+DEFAULT_HARD_THRESHOLD=False
+DEFAULT_INTENSITY_THRESHOLD=100
+DEFAULT_PREPROCESS_DATA=False
 
 #
 #   REQUEST_PARSER
@@ -28,12 +31,13 @@ class RequestParser(object):
         'width',
         'intensity_threshold',
         'iterations',
-        'weight_by_intensity',
+        'hard_threshold',
         'min_count',
         'downsample',
         'table_name',
         'bucket',
-        'data_path']
+        'data_path',
+        'preprocess_data']
 
 
     DATA_PROPERTIES=[
@@ -48,7 +52,7 @@ class RequestParser(object):
         'width',
         'intensity_threshold',
         'iterations',
-        'weight_by_intensity',
+        'hard_threshold',
         'min_count',
         'downsample']
 
@@ -89,7 +93,6 @@ class RequestParser(object):
             request['file_name'],
             request.get('download_folder'),
             request.get('url'))
-        print(request)
         return request
 
 
@@ -120,14 +123,15 @@ class RequestParser(object):
             'timestamp': now.strftime("%Y%m%d::%H:%M:%S"),
             'width': env.int('width'),
             'intensity_threshold': env.int('intensity_threshold'),
-            'iterations': env.int('intensity_threshold'),
-            'weight_by_intensity': env.bool('weight_by_intensity'),
+            'iterations': env.int('iterations'),
+            'hard_threshold': env.bool('hard_threshold',default=DEFAULT_HARD_THRESHOLD),
             'min_count': env.int('min_count'),
             'downsample': env.int('downsample'),
             'url': env.get('url',default=None),
             'table_name': env.get('table'),
             'bucket': env.get('bucket',default=None),
-            'download_folder': env.get('download_folder',default=DEFAULT_DOWNLOAD_FOLDER)}
+            'download_folder': env.get('download_folder',default=DEFAULT_DOWNLOAD_FOLDER),
+            'preprocess_data': env.get('preprocess_data',default=None)}
 
 
 
