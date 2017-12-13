@@ -29,7 +29,7 @@ class GLAD(object):
         start_days=self._date_to_days(self.start_date)
         end_days=self._date_to_days(self.end_date)
         intensity, days=self._get_intensity_days(data)
-        mask=np.logical_or(days<start_days,days>end_days)
+        mask=np.logical_or(days<=start_days,days>end_days)
         np.putmask(intensity,mask,0)
         return intensity
 
