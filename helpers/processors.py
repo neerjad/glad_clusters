@@ -16,7 +16,7 @@ class GLAD(object):
 
 
     def data(self):
-        print('DATA',self.raw_data)
+        print('FAKE DATA',self.raw_data[:,:,2])
         if not self._data:
             self._data=self._process_data()
         return self._data

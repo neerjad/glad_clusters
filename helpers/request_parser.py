@@ -10,7 +10,7 @@ DEFAULT_Z=5
 DEFAULT_DOWNLOAD_FOLDER='/tmp'
 DEFAULT_HARD_THRESHOLD=False
 DEFAULT_INTENSITY_THRESHOLD=100
-DEFAULT_PREPROCESS_DATA=False
+DEFAULT_PREPROCESS_DATA=True
 
 #
 #   REQUEST_PARSER
@@ -131,7 +131,7 @@ class RequestParser(object):
             'table_name': env.get('table'),
             'bucket': env.get('bucket',default=None),
             'download_folder': env.get('download_folder',default=DEFAULT_DOWNLOAD_FOLDER),
-            'preprocess_data': env.get('preprocess_data',default=None)}
+            'preprocess_data': env.get('preprocess_data',default=DEFAULT_PREPROCESS_DATA)}
 
 
 
