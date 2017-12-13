@@ -6,22 +6,31 @@ WIDTH=15
 MIN_COUNT=6
 INTENSITY_THRESHOLD=100
 ITERATIONS=25
+WEIGHT_BY_INTENSITY=False
+DOWNSAMPLE=False
+
 INDICES=np.indices((256,256))
 
 class MShift(object):
     #
     # PUBLIC METHODS
     #
-    def __init__(self,data,
+    def __init__(self,
+            data,
             width=WIDTH,
             min_count=MIN_COUNT,
             intensity_threshold=INTENSITY_THRESHOLD,
-            iterations=ITERATIONS):
+            iterations=ITERATIONS,
+            weight_by_intensity=WEIGHT_BY_INTENSITY,
+            downsample=DOWNSAMPLE):
         self.data=data
         self.width=width/100.0
         self.min_count=min_count
         self.threshold=intensity_threshold
         self.iterations=iterations
+        # TODO: Implement wbi and dsmpl
+        self.weight_by_intensity=weight_by_intensity
+        self.downsample=downsample
         self._init_properties()
 
 

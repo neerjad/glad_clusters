@@ -1,6 +1,11 @@
 from os import environ
 import __builtin__
 
+try:
+  basestring
+except NameError:
+  basestring = str
+
 #
 #  ENV/CONFIG
 #
@@ -9,7 +14,7 @@ def get(var_name,default=False,typ=None,required=True):
         val=environ[var_name]
     else:
         val=environ.get(var_name,default)
-    val=_strtoval(val)
+    val=_tovalue(val,typ)
     if val and typ:
         val=getattr(__builtin__,typ)(val)
     return val
@@ -31,14 +36,14 @@ def bool(var_name,default=None,required=False):
     return get(var_name,default=default,typ='bool',required=required)
 
 
-def _strtoval(string):
-    if string:
-        lc_string=string.lower()
-        if lc_string=='false':
+def _tovalue(val,typ):
+    if isinstance(val,basestring):
+        lc_val=val.lower()
+        if lc_val=='false':
             return False
-        elif lc_string=='true':
+        elif lc_val=='true':
             return True
-        elif lc_string=='none':
+        elif lc_val=='none':
             return None
-        else:
-            return string
+        return val
+    return val

@@ -5,8 +5,9 @@ import re
 #
 #   CONSTANTS
 #
-GLAD_START_DATE_STR='20150101'
-
+DEFAULT_START_DATE=20150101
+DEFAULT_Z=5
+DEFAULT_DOWNLOAD_FOLDER='/tmp'
 
 #
 #   REQUEST_PARSER
@@ -18,12 +19,11 @@ class RequestParser(object):
         'x',
         'y',
         'file_name',
+        'download_folder',
         'url',
-        'data_root',
-        'date_range',
-        'zoom',
         'start_date',
         'end_date',
+        'date_range',
         'timestamp',
         'width',
         'intensity_threshold',
@@ -37,13 +37,13 @@ class RequestParser(object):
 
 
     DATA_PROPERTIES=[
-        'date_range',
         'z',
         'x',
         'y',
         'file_name',
         'start_date',
         'end_date',
+        'date_range',
         'timestamp',
         'width',
         'intensity_threshold',
@@ -81,32 +81,32 @@ class RequestParser(object):
                 request['end_date'],
             )
         request['file_name']=self._get_file_name(
-            request.get('file_name'))
+            request.get('file_name'),
+            request.get('z'),
+            request.get('x'),
+            request.get('y'))
         request['data_path']=self._get_data_path(
             request['file_name'],
-            request.get('data_root'),
+            request.get('download_folder'),
             request.get('url'))
+        print(request)
         return request
 
 
-    def _get_file_name(self,file_name):
+    def _get_file_name(self,file_name,z,x,y):
         if not file_name:
-            file_name='{}/{}/{}'.format(
-                    request.get('z'),
-                    request.get('x'),
-                    request.get('y')
-                )
+            file_name='{}/{}/{}'.format(z,x,y)
         if self.ext:
             if not re.search('.{}^'.format(self.ext), file_name):
                 file_name='{}.{}'.format(file_name,self.ext)
         return file_name
 
 
-    def _get_data_path(self,path,data_root,url):
-        if data_root:
-            path='{}/{}'.format(data_root,path)
+    def _get_data_path(self,path,download_folder,url):
         if url:
             path='{}/{}'.format(url,path)
+        elif download_folder:
+            path='{}/{}'.format(download_folder,path)
         return path
 
 
@@ -114,8 +114,8 @@ class RequestParser(object):
     def _get_default_properties():
         now=datetime.now()
         return {
-            'z': env.int('zoom'),
-            'start_date': env.int('start_date',default=GLAD_START_DATE_STR),
+            'z': env.int('z',default=DEFAULT_Z),
+            'start_date': env.int('start_date',default=DEFAULT_START_DATE),
             'end_date': env.int('end_date',default=now.strftime("%Y%m%d")),
             'timestamp': now.strftime("%Y%m%d::%H:%M:%S"),
             'width': env.int('width'),
@@ -126,7 +126,8 @@ class RequestParser(object):
             'downsample': env.int('downsample'),
             'url': env.get('url',default=None),
             'table_name': env.get('table'),
-            'bucket': env.get('bucket',default=None)}
+            'bucket': env.get('bucket',default=None),
+            'download_folder': env.get('download_folder',default=DEFAULT_DOWNLOAD_FOLDER)}
 
 
 

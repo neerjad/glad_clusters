@@ -14,7 +14,6 @@ class AWS(object):
 
 
 class S3(object):
-    DOWNLOAD_FOLDER='/tmp'
     CLIENT_NAME='s3'
     #
     # PUBLIC METHODS

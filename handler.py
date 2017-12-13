@@ -16,7 +16,7 @@ def meanshift(event, context):
     aws=AWS(req.table_name,req.bucket)
     if not req.url: aws.s3.download(req.file_name,req.data_path)
     # get data
-    im_data=GLAD(data_path=req.data_path).data(
+    im_data=GLAD(req.data_path).data(
             start_date=req.start_date,
             end_date=req.end_date)
     # run cluster
@@ -25,7 +25,9 @@ def meanshift(event, context):
         width=req.width,
         min_count=req.min_count,
         intensity_threshold=req.intensity_threshold,
-        iterations=req.iterations)
+        iterations=req.iterations,
+        weight_by_intensity=req.weight_by_intensity,
+        downsample=req.downsample)
     # output
     data=req.data()
     data['input_data']=mshift.input_data().tolist()
