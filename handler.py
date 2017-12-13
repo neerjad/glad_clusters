@@ -4,7 +4,7 @@ import logging
 import imageio as io
 from helpers.meanshift import MShift
 from helpers.request_parser import RequestParser
-from helpers.glad import GLAD
+from helpers.processors import GLAD,Thresholder
 from helpers.aws import AWS
 #
 # LOGGING CONFIG
@@ -22,19 +22,21 @@ def meanshift(event, context):
     req=RequestParser(event)
     aws=AWS(req.table_name,req.bucket)
     if not req.url: aws.s3.download(req.file_name,req.data_path)
-    # get data
+    # load/process data
+    im_data=io.imread(req.data_path)
     if req.preprocess_data:
         im_data=GLAD(
-            data_path=req.data_path,
+            data=im_data,
             start_date=req.start_date,
-            end_date=req.end_date,
+            end_date=req.end_date).data()
+    if req.intensity_threshold:
+        im_data=Thresholder(
+            data=im_data,
             intensity_threshold=req.intensity_threshold,
             hard_threshold=req.hard_threshold).data()
-    else:
-        im_data=io.imread(req.data_path)
     # run cluster
     mshift=MShift(
-        im_data,
+        data=im_data,
         width=req.width,
         min_count=req.min_count,
         iterations=req.iterations,
