@@ -14,7 +14,7 @@ import logger
 def meanshift(event, context):
     req=RequestParser(event)
     aws=AWS(req.table_name,req.bucket)
-    if not req.url: aws.s3.download(req.file_name)
+    if not req.url: aws.s3.download(req.file_name,req.data_path)
     # get data
     im_data=GLAD(data_path=req.data_path).data(
             start_date=req.start_date,
@@ -28,8 +28,8 @@ def meanshift(event, context):
         iterations=req.iterations)
     # output
     data=req.data()
-    data['input_data']=mshift.input_data()
-    data['clusters']=mshift.clusters()
+    data['input_data']=mshift.input_data().tolist()
+    data['clusters']=mshift.clusters().tolist()
     data['nb_clusters']=len(data['clusters'])
     # save data
     aws.db.put(data)

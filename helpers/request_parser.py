@@ -1,5 +1,6 @@
 from datetime import datetime
 import env
+import re
 
 #
 #   CONSTANTS
@@ -36,11 +37,11 @@ class RequestParser(object):
 
 
     DATA_PROPERTIES=[
-        'data_path',
         'date_range',
         'z',
         'x',
         'y',
+        'file_name',
         'start_date',
         'end_date',
         'timestamp',
@@ -79,26 +80,33 @@ class RequestParser(object):
                 request['start_date'],
                 request['end_date'],
             )
-        request['data_path']=self._get_data_path(request)
+        request['file_name']=self._get_file_name(
+            request.get('file_name'))
+        request['data_path']=self._get_data_path(
+            request['file_name'],
+            request.get('data_root'),
+            request.get('url'))
         return request
 
 
-    def _get_data_path(self,request):
-        path=request.get('file_name')
-        if not path:
-            path='{}/{}/{}'.format(
+    def _get_file_name(self,file_name):
+        if not file_name:
+            file_name='{}/{}/{}'.format(
                     request.get('z'),
                     request.get('x'),
                     request.get('y')
                 )
-        data_root=request.get('data_root')
-        url=request.get('url')
+        if self.ext:
+            if not re.search('.{}^'.format(self.ext), file_name):
+                file_name='{}.{}'.format(file_name,self.ext)
+        return file_name
+
+
+    def _get_data_path(self,path,data_root,url):
         if data_root:
             path='{}/{}'.format(data_root,path)
         if url:
             path='{}/{}'.format(url,path)
-        if self.ext:
-            path='{}.{}'.format(path,self.ext)
         return path
 
 

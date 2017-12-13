@@ -19,17 +19,14 @@ class S3(object):
     #
     # PUBLIC METHODS
     #
-    def __init__(self,bucket,ext='png'):
+    def __init__(self,bucket):
         self.bucket=bucket
-        self.ext=ext
 
 
-    def download(self,file):
-        if self.ext:
-            file='{}.{}'.format(file,self.ext)
-        self.download_path='{}/{}'.format(self.DOWNLOAD_FOLDER,file)
-        client=boto3.resource(self.CLIENT_NAME)
-        return client.meta.client.download_file(self.bucket,file,self.download_path)
+    def download(self,file,download_path):
+        client=boto3.resource(self.CLIENT_NAME).meta.client
+        print(self.bucket,file,download_path)
+        return client.download_file(self.bucket,file,download_path)
 
 
 
