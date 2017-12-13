@@ -1,6 +1,5 @@
-S3_DOWNLOAD_FOLDER='/tmp/'
-DYNAMODB='dynamodb'
-S3='s3'
+import boto3
+
 
 
 class AWS(object):
@@ -11,26 +10,33 @@ class AWS(object):
         self.s3=S3(bucket)
         self.db=DynamoDB(table_name)
 
-
+s3_client=boto3.resource('s3')
 
 
 class S3(object):
+    DOWNLOAD_FOLDER='/tmp'
+    CLIENT_NAME='s3'
     #
     # PUBLIC METHODS
     #
-    def __init__(self,bucket):
+    def __init__(self,bucket,ext='png'):
         self.bucket=bucket
+        self.ext=ext
 
 
     def download(self,file):
-        client=boto3.resource(S3)
-        self.download_path='{}/{}'.format(S3_DOWNLOAD_FOLDER,file)
-        return self.client.download_file(self.bucket,file,self.download_path)
+        client=boto3.resource(self.CLIENT_NAME)
+        self.download_path='{}/{}'.format(self.DOWNLOAD_FOLDER,file)
+        if self.ext:
+           self.download_path='{}.{}'.format(self.download_path,self.ext) 
+        print(self.bucket,file,self.download_path)
+        return s3_client.download_file(self.bucket,file,self.download_path)
 
 
 
 
 class DynamoDB(object):
+    CLIENT_NAME='dynamodb'
     #
     # PUBLIC METHODS
     #
@@ -40,5 +46,5 @@ class DynamoDB(object):
 
     def put(self,data):
         self.db_data=data
-        table=boto3.resource(DYNAMODB).Table(self.table_name)
+        table=boto3.resource(self.CLIENT_NAME).Table(self.table_name)
         return table.put_item(Item=data)

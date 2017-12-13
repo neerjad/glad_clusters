@@ -1,4 +1,4 @@
-
+import imageio as io
 
 
 class GLAD(object):
@@ -7,6 +7,7 @@ class GLAD(object):
     #
     def __init__(self,data_path):
         self.data_path=data_path
+        print('--',data_path)
         self.raw_data=io.imread(data_path)
 
 
