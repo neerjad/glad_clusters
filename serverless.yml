@@ -57,6 +57,6 @@ plugins:
 
 custom:
   pythonRequirements:
-  dockerizePip: true
+    dockerizePip: true
   stage: "${opt:stage, self:provider.stage}"
 
