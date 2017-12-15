@@ -26,8 +26,8 @@ provider:
   iamRoleStatements:
       - Effect: "Allow"
         Action:
-          - "s3:ListObjects"
-          - "s3:GetObject"
+          - "s3:List*"
+          - "s3:Get*"
           - "s3:PutObject"
         Resource:
            - "arn:aws:s3:::wri-tiles"
