@@ -30,16 +30,16 @@ class MShift(object):
 
     def input_data(self):
         if self._input_data is None:
-            ijimage=np.apply_along_axis(self._ijdata,0,INDICES)
-            ij_rows=ijimage.reshape(3,-1)
-            zeros=np.all(np.equal(ij_rows, 0),axis=0)
-            self._input_data=ij_rows[:,~zeros]
-        return self._input_data.astype(int)
+            self._input_data=np.dstack((INDICES[0],INDICES[1],self.data))
+            self._input_data=self._input_data.reshape(256*256,-1)
+            self._input_data=self._input_data[self._input_data[:,-1]>1]
+        return self._input_data
 
 
     def clustered_data(self):
         if self._clusters is None:   
-            self._clusters=np.delete(self.input_data().copy(),2,axis=0).reshape(-1,2)
+            self._clusters=np.delete(self.input_data().copy(),-1,axis=1)
+            values=self.input_data().copy()[:,-1]
             for n in range(self.iterations):
                 for i, x in enumerate(self._clusters):
                     dist = np.sqrt(((x-self._clusters)**2).sum(1))
@@ -68,16 +68,6 @@ class MShift(object):
 
     def _gaussian(self,d):
         return np.exp(-0.5*((d/self.width))**2) / (self.width*math.sqrt(2*math.pi))
-
-
-    def _ijdata(self,idx):
-        i=idx[0]
-        j=idx[1]
-        val=self.data[i,j]
-        if val>0:
-            return [i,j,val]
-        else:
-            return np.zeros(3)
 
 
 

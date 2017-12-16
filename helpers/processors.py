@@ -29,16 +29,16 @@ class GLAD(object):
         start_days=self._date_to_days(self.start_date)
         end_days=self._date_to_days(self.end_date)
         intensity, days=self._get_intensity_days(data)
-        mask=np.logical_or(days<=start_days,days>end_days)
-        np.putmask(intensity,mask,0)
+        bounds=np.logical_and(days>=start_days,days<end_days)
+        np.where(bounds,intensity,0)
         return intensity
 
 
     def _get_intensity_days(self,data):
         confidence_intensity=data[:,:,2]
         days=(255 * data[:,:,0]) + data[:,:,1]
-        intensity=np.mod(confidence_intensity,100)*100/55
-        return intensity, days
+        intensity=np.mod(confidence_intensity,100)*100.0/55
+        return intensity.astype(int), days
 
 
     def _date_to_days(self,date_str):
