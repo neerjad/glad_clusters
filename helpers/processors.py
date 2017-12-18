@@ -36,7 +36,7 @@ class GLAD(object):
     def _get_intensity_days(self,data):
         confidence_intensity=data[:,:,2]
         days=(255.0 * data[:,:,0]) + data[:,:,1]
-        intensity=np.mod(confidence_intensity,100)*100/55
+        intensity=np.mod(confidence_intensity,100.0)*100.0/55
         return intensity, days
 
 
