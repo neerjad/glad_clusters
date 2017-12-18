@@ -28,6 +28,7 @@ node_modules/
 package-lock.json
 package.json
 venv/
+notebooks/
 
 # Serverless directories
 .serverless

@@ -45,6 +45,7 @@ provider:
 package:
   exclude:
     - venv/**
+    - notebooks/**
     - local_env.py
 
 functions:
