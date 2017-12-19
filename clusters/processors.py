@@ -1,72 +1,53 @@
 from datetime import datetime
 import numpy as np
 
+
 DATE_STR_FMT='%Y-%m-%d'
-GLAD_START_DATE_STR='2015-01-01'
-
-class GLAD(object):
-
-    @staticmethod
-    def to_datetime(date_str):
-        return datetime.strptime(date_str,DATE_STR_FMT)
+GLAD_START_DATE=datetime.strptime('2015-01-01',DATE_STR_FMT)
 
 
-    #
-    # PUBLIC METHODS
-    #
-    def __init__(self,
-            data=None,
-            start_date=None,
-            end_date=None):
-        self._data=None
-        self.glad_start_date=GLAD.to_datetime(GLAD_START_DATE_STR)
-        self.start_date=start_date
-        self.end_date=end_date
-        self.data=self._process_data(data)
+"""glad_between_dates
+
+"""
+def glad_between_dates(data,start_date,end_date,intensity_only=True):
+    intensity, days=_get_intensity_days(data)
+    days_test=_days_are_between_dates(days,start_date,end_date)
+    if intensity_only:
+        return np.where(days_test,intensity,0)
+    else:
+        days_test=np.dstack([days_test,days_test,days_test])
+        return np.where(days_test,data,0)
 
 
-    def _process_data(self,data):
-        start_days=self._date_to_days(self.start_date)
-        end_days=self._date_to_days(self.end_date)
-        intensity, days=self._get_intensity_days(data)
-        bounds=np.logical_and(days>=start_days,days<end_days)
-        return np.where(bounds,intensity,0)
+def _days_are_between_dates(days,start_date,end_date):
+    start_days=_days_since_glad_start(start_date)
+    end_days=_days_since_glad_start(end_date)
+    return np.logical_and(days>=start_days,days<end_days)
 
 
-    def _get_intensity_days(self,data):
-        confidence_intensity=data[:,:,2]
-        days=(255.0 * data[:,:,0]) + data[:,:,1]
-        intensity=np.mod(confidence_intensity,100.0)*100.0/55
-        return intensity, days
+def _days_since_glad_start(date_str):
+    date=datetime.strptime(date_str,DATE_STR_FMT)
+    return (date-GLAD_START_DATE).days
 
 
-    def _date_to_days(self,date_str):
-        date=GLAD.to_datetime(date_str)
-        return (date-self.glad_start_date).days
+def _get_intensity_days(data):
+    confidence_intensity=data[:,:,2]
+    days=(255.0 * data[:,:,0]) + data[:,:,1]
+    intensity=np.mod(confidence_intensity,100.0)*100.0/55
+    return intensity, days
 
 
 
 
 
-class Thresholder(object):
-    #
-    # PUBLIC METHODS
-    #
-    def __init__(self,
-            data=None,
-            intensity_threshold=None,
-            hard_threshold=False):
-        self.data=self._process_data(
-            data,
-            intensity_threshold,
-            hard_threshold)
 
+"""threshold
 
-    def _process_data(self,data,threshold,hard):
-        if threshold:
-            if hard:
-                data=(data>threshold).astype(int)
-            else:
-                np.putmask(data,data<=threshold,0)
-        return data
+"""
+def threshold(data,threshold=0,hard_threshold=False):
+    test=(data>threshold)
+    if hard_threshold:
+        return test.astype(float)
+    else:
+        return np.where(test,data,0.0)
 

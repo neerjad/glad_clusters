@@ -2,12 +2,14 @@ import math
 import numpy as np
 
 
+NOISY=True
+
 WIDTH=15
 MIN_COUNT=6
 ITERATIONS=25
 DOWNSAMPLE=False
-
-INDICES=np.indices((256,256))
+SIZE=256
+INDICES=np.indices((SIZE,SIZE))
 
 class MShift(object):
     #
@@ -31,16 +33,18 @@ class MShift(object):
     def input_data(self):
         if self._input_data is None:
             self._input_data=np.dstack((INDICES[0],INDICES[1],self.data))
-            self._input_data=self._input_data.reshape(256*256,-1)
-            self._input_data=self._input_data[self._input_data[:,-1]>1]
+            self._input_data=self._input_data.reshape(SIZE**2,-1)
+            self._input_data=self._input_data[self._input_data[:,-1]>0].astype(int)
         return self._input_data
 
 
     def clustered_data(self):
         if self._clusters is None:   
+            values=self.input_data()[:,-1]
             self._clusters=np.delete(self.input_data().copy(),-1,axis=1)
-            values=self.input_data().copy()[:,-1]
             for n in range(self.iterations):
+                if NOISY: 
+                    if (n+1)%5==0: print("...{}/{}".format(n+1,self.iterations))
                 for i, x in enumerate(self._clusters):
                     dist = np.sqrt(((x-self._clusters)**2).sum(1))
                     weight = self._gaussian(dist)
@@ -54,6 +58,7 @@ class MShift(object):
             xu,count=np.unique(self.clustered_data(),axis=0,return_counts=True)
             for t,cnt in zip(xu,count): 
                 if cnt>=self.min_count: 
+                    t=np.append(t,cnt)
                     points.append(t.tolist())
         return np.array(points).astype(int)
 

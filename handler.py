@@ -2,10 +2,10 @@ from __future__ import print_function
 import json
 import logging
 import imageio as io
-from helpers.meanshift import MShift
-from helpers.request_parser import RequestParser
-from helpers.processors import GLAD,Thresholder
-from helpers.aws import AWS
+from clusters.meanshift import MShift
+from clusters.request_parser import RequestParser
+import clusters.processors as proc
+from clusters.aws import AWS
 #
 # LOGGING CONFIG
 #
@@ -25,15 +25,15 @@ def meanshift(event, context):
     # load/process data
     im_data=io.imread(req.data_path)
     if req.preprocess_data:
-        im_data=GLAD(
-            data=im_data,
-            start_date=req.start_date,
-            end_date=req.end_date).data
+        im_data=proc.glad_between_dates(
+            im_data,
+            req.start_date,
+            req.end_date)
     if req.intensity_threshold:
-        im_data=Thresholder(
-            data=im_data,
-            intensity_threshold=req.intensity_threshold,
-            hard_threshold=req.hard_threshold).data
+        im_data=proc.threshold(
+            im_data,
+            threshold=req.intensity_threshold,
+            hard_threshold=req.hard_threshold)
     # run cluster
     mshift=MShift(
         data=im_data,
