@@ -2,8 +2,7 @@ import math
 import numpy as np
 
 
-NOISY=True
-
+NOISY=False
 WIDTH=15
 MIN_COUNT=6
 ITERATIONS=25
@@ -22,19 +21,20 @@ class MShift(object):
             iterations=ITERATIONS,
             downsample=DOWNSAMPLE):
         self.data=data
-        self.width=width/100.0
+        self.width=width
         self.min_count=min_count
         self.iterations=iterations
-        # TODO: Implement wbi and dsmpl
         self.downsample=downsample
         self._init_properties()
 
 
     def input_data(self):
         if self._input_data is None:
-            self._input_data=np.dstack((INDICES[0],INDICES[1],self.data))
+            ix=np.subtract(INDICES[0],(SIZE-1)/2.0)
+            iy=np.subtract(INDICES[1],(SIZE-1)/2.0)
+            self._input_data=np.dstack((ix,iy,self.data))
             self._input_data=self._input_data.reshape(SIZE**2,-1)
-            self._input_data=self._input_data[self._input_data[:,-1]>0].astype(int)
+            self._input_data=self._input_data[self._input_data[:,-1]>0]
         return self._input_data
 
 
@@ -55,12 +55,17 @@ class MShift(object):
     def clusters(self):
         points=[]
         if len(self.clustered_data()):
-            xu,count=np.unique(self.clustered_data(),axis=0,return_counts=True)
+            if self.downsample:
+                # TODO: THINK MORE ABOUT THIS STEP & UPSAMPLING
+                cluster_data=self.clustered_data()/self.downsample
+            else:
+                cluster_data=self.clustered_data()
+            xu,count=np.unique(cluster_data.astype(int),axis=0,return_counts=True)
             for t,cnt in zip(xu,count): 
                 if cnt>=self.min_count: 
                     t=np.append(t,cnt)
                     points.append(t.tolist())
-        return np.array(points).astype(int)
+        return np.array(points)
 
 
     #
@@ -73,7 +78,6 @@ class MShift(object):
 
     def _gaussian(self,d):
         return np.exp(-0.5*((d/self.width))**2) / (self.width*math.sqrt(2*math.pi))
-
 
 
 
