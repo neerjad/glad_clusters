@@ -43,8 +43,8 @@ def meanshift(event, context):
         downsample=req.downsample)
     # output
     data=req.data()
-    data['input_data']=mshift.input_data().tolist()
-    data['clusters']=mshift.clusters().tolist()
+    data['input_data']=MShift.zero_shifted_list(mshift.centered_data())
+    data['clusters']=MShift.zero_shifted_list(mshift.clusters())
     data['nb_clusters']=len(data['clusters'])
     # save data
     aws.db.put(data)

@@ -9,8 +9,20 @@ ITERATIONS=25
 DOWNSAMPLE=False
 SIZE=256
 INDICES=np.indices((SIZE,SIZE))
+SHIFT=(SIZE-1)/2.0
 
 class MShift(object):
+
+
+    @staticmethod
+    def zero_shifted_list(data_arr):
+        data_arr=data_arr.copy()
+        data_arr[:,0]=np.add(data_arr[:,0],SHIFT)
+        data_arr[:,1]=np.add(data_arr[:,1],SHIFT)
+        return data_arr.astype(int).tolist()
+
+
+
     #
     # PUBLIC METHODS
     #
@@ -28,20 +40,20 @@ class MShift(object):
         self._init_properties()
 
 
-    def input_data(self):
-        if self._input_data is None:
-            ix=np.subtract(INDICES[0],(SIZE-1)/2.0)
-            iy=np.subtract(INDICES[1],(SIZE-1)/2.0)
-            self._input_data=np.dstack((ix,iy,self.data))
-            self._input_data=self._input_data.reshape(SIZE**2,-1)
-            self._input_data=self._input_data[self._input_data[:,-1]>0]
-        return self._input_data
+    def centered_data(self):
+        if self._centered_data is None:
+            ix=np.subtract(INDICES[0],SHIFT)
+            iy=np.subtract(INDICES[1],SHIFT)
+            self._centered_data=np.dstack((ix,iy,self.data))
+            self._centered_data=self._centered_data.reshape(SIZE**2,-1)
+            self._centered_data=self._centered_data[self._centered_data[:,-1]>0]
+        return self._centered_data
 
 
     def clustered_data(self):
         if self._clusters is None:   
-            values=self.input_data()[:,-1]
-            self._clusters=np.delete(self.input_data().copy(),-1,axis=1)
+            values=self.centered_data()[:,-1]
+            self._clusters=np.delete(self.centered_data().copy(),-1,axis=1)
             for n in range(self.iterations):
                 if NOISY: 
                     if (n+1)%5==0: print("...{}/{}".format(n+1,self.iterations))
@@ -72,7 +84,7 @@ class MShift(object):
     # INTERNAL 
     #
     def _init_properties(self):
-        self._input_data=None
+        self._centered_data=None
         self._clusters=None
 
 
