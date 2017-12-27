@@ -1,9 +1,11 @@
 from __future__ import print_function
 import yaml
 import os
+
+DIR=os.path.dirname(os.path.abspath(__file__))
 NOISY=True
 
-with open('env.yml') as file:
+with open("{}/{}".format(DIR,'env.yml')) as file:
     env = yaml.safe_load(file)
 
 
