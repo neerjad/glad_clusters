@@ -21,8 +21,20 @@ logger.setLevel(logging.INFO)
 def meanshift(event, context):
     req=RequestParser(event)
     aws=AWS(req.table_name,req.bucket)
+    im_data=_im_data(req,aws)
+    mshift=MShift(
+        data=im_data,
+        width=req.width,
+        min_count=req.min_count,
+        iterations=req.iterations,
+        downsample=req.downsample)
+    output_data=_output_data(req,mshift)
+    aws.db.put(output_data)
+    return _process_response(event,output_data)
+
+
+def _im_data(req,aws):
     if not req.url: aws.s3.download(req.file_name,req.data_path)
-    # load/process data
     im_data=io.imread(req.data_path)
     if req.preprocess_data:
         im_data=proc.glad_between_dates(
@@ -34,25 +46,22 @@ def meanshift(event, context):
             im_data,
             threshold=req.intensity_threshold,
             hard_threshold=req.hard_threshold)
-    # run cluster
-    mshift=MShift(
-        data=im_data,
-        width=req.width,
-        min_count=req.min_count,
-        iterations=req.iterations,
-        downsample=req.downsample)
-    # output
+    return im_data
+
+
+def _output_data(req,mshift):
     data=req.data()
     data['input_data']=MShift.zero_shifted_list(mshift.centered_data())
     data['clusters']=MShift.zero_shifted_list(mshift.clusters())
     data['nb_clusters']=len(data['clusters'])
-    # save data
-    aws.db.put(data)
-    # response
+    return data
+
+
+def _process_response(event,output_data):
     body = {
         "event": "{}".format(event),
-        "message": "FOUND {} CLUSTERS".format(data['nb_clusters']),
-        "table_data": data,
+        "message": "FOUND {} CLUSTERS".format(output_data['nb_clusters']),
+        "table_data": output_data,
     }
     response = {
         "statusCode": 200,
