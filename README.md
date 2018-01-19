@@ -35,16 +35,31 @@ sls invoke -f meanshift -l -d '{"file":"gc7"}'
 
 
 ---
-##### WORKPLAN
+##### NOTES
 
-- [x] extend old meanshift code to lambda
-- [ ] fetch/preprocess/run real GLAD data from s3
-- [ ] add run details (tile_zxy,dates,thresholds,etc) to db-write
-- [ ] class for location mapping
-    - [ ] latlon to tiles zxy
-    - [ ] latlon range to list of zxy-s
-    - [ ] zxy-ij to latlon
-- [ ] batch meanshift handler
-- [ ] class for reading results
-    - [ ] fetch from db
-    - [ ] produce image,cluster_image,combined_image
+---
+###### TABLE DATA:
+
+- CLUSTER DATA
+    + location (tile: i,j)
+    + number of alerts
+    + area of convexhull
+    + max/min date of alerts
+    + original alert locations
+- RUN SPECS
+    + max/min date
+    + threshold
+    + width
+    + min_count
+    + x/y/z
+    + optional
+        * hard threshold
+        * intensity threshold
+        * iterations
+- OTHER OPTIONAL
+    + file_name
+    + input_data
+
+
+
+
