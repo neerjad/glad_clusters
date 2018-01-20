@@ -91,7 +91,7 @@ class MShift(object):
                 (xys,counts),
                 axis=-1)
             self._clusters=self._clusters[
-                self._clusters[:,1]>self.min_count]
+                self._clusters[:,-1]>=self.min_count]
         return self._clusters
 
 
