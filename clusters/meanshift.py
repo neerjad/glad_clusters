@@ -45,39 +45,55 @@ class MShift(object):
             ix=np.subtract(INDICES[0],SHIFT)
             iy=np.subtract(INDICES[1],SHIFT)
             self._centered_data=np.dstack((ix,iy,self.data))
+            print(self._centered_data)
             self._centered_data=self._centered_data.reshape(SIZE**2,-1)
             self._centered_data=self._centered_data[self._centered_data[:,-1]>0]
         return self._centered_data
 
 
     def clustered_data(self):
-        if self._clusters is None:   
-            values=self.centered_data()[:,-1]
-            self._clusters=np.delete(self.centered_data().copy(),-1,axis=1)
+        """ shift i,j values using meanshift algo
+            
+            * groups points at a given i,j
+            * thresholds for nb_pts>min_count
+
+            Returns: 
+                array of [i,j] valued arrays
+        """
+        if self._clustered_data is None:   
+            self._clustered_data=self.centered_data()[:,:2].copy()
             for n in range(self.iterations):
                 if NOISY: 
                     if (n+1)%5==0: print("...{}/{}".format(n+1,self.iterations))
-                for i, x in enumerate(self._clusters):
-                    dist = np.sqrt(((x-self._clusters)**2).sum(1))
-                    weight = self._gaussian(dist)
-                    self._clusters[i] = (np.expand_dims(weight,1)*self._clusters).sum(0) / weight.sum()
-        return self._clusters
+                for i, x in enumerate(self._clustered_data):
+                    dist=np.sqrt(((x-self._clustered_data)**2).sum(1))
+                    weight=self._gaussian(dist)
+                    self._clustered_data[i]=(
+                        np.expand_dims(weight,1)*self._clustered_data).sum(0)/weight.sum()
+                self._clustered_data=self._clustered_data.round().astype(int)
+        return self._clustered_data
 
 
     def clusters(self):
-        points=[]
-        if len(self.clustered_data()):
-            if self.downsample:
-                # TODO: THINK MORE ABOUT THIS STEP & UPSAMPLING
-                cluster_data=self.clustered_data()/self.downsample
-            else:
-                cluster_data=self.clustered_data()
-            xu,count=np.unique(cluster_data.astype(int),axis=0,return_counts=True)
-            for t,cnt in zip(xu,count): 
-                if cnt>=self.min_count: 
-                    t=np.append(t,cnt)
-                    points.append(t.tolist())
-        return np.array(points)
+        """ group into clusters
+            
+            * groups points at a given i,j
+            * thresholds for nb_pts>min_count
+
+            Returns: 
+                array of [i,j] valued arrays
+        """
+        if self._clusters is None:   
+            ijs,count=np.unique(
+                self.clustered_data(),
+                axis=0,
+                return_counts=True)
+            self._clusters=np.concatenate(
+                (ijs,np.expand_dims(count,axis=-1)),
+                axis=-1)
+            self._clusters=self._clusters[
+                self._clusters[:,-1]>self.min_count]
+        return self._clusters
 
 
     #
@@ -85,6 +101,7 @@ class MShift(object):
     #
     def _init_properties(self):
         self._centered_data=None
+        self._clustered_data=None
         self._clusters=None
 
 
