@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from clusters.convex_hull import ConvexHull
 
 
 NOISY=False
@@ -42,23 +43,20 @@ class MShift(object):
 
     def centered_data(self):
         if self._centered_data is None:
-            ix=np.subtract(INDICES[0],SHIFT)
-            iy=np.subtract(INDICES[1],SHIFT)
-            self._centered_data=np.dstack((ix,iy,self.data))
-            print(self._centered_data)
+            i=np.subtract(INDICES[0],SHIFT)
+            j=np.subtract(INDICES[1],SHIFT)
+            self._centered_data=np.dstack((i,j,self.data))
             self._centered_data=self._centered_data.reshape(SIZE**2,-1)
             self._centered_data=self._centered_data[self._centered_data[:,-1]>0]
         return self._centered_data
 
 
     def clustered_data(self):
-        """ shift i,j values using meanshift algo
-            
-            * groups points at a given i,j
-            * thresholds for nb_pts>min_count
+        """ shift initial i,j values using mean-shift
+            to final x,y value
 
             Returns: 
-                array of [i,j] valued arrays
+                array of [x,y] valued arrays
         """
         if self._clustered_data is None:   
             self._clustered_data=self.centered_data()[:,:2].copy()
@@ -77,23 +75,52 @@ class MShift(object):
     def clusters(self):
         """ group into clusters
             
-            * groups points at a given i,j
+            * groups points at a given x,y
             * thresholds for nb_pts>min_count
 
             Returns: 
-                array of [i,j] valued arrays
+                array of [x,y,count] valued arrays
         """
         if self._clusters is None:   
-            ijs,count=np.unique(
+            xys,counts=np.unique(
                 self.clustered_data(),
                 axis=0,
                 return_counts=True)
+            counts=np.expand_dims(counts,axis=-1)
             self._clusters=np.concatenate(
-                (ijs,np.expand_dims(count,axis=-1)),
+                (xys,counts),
                 axis=-1)
             self._clusters=self._clusters[
-                self._clusters[:,-1]>self.min_count]
+                self._clusters[:,1]>self.min_count]
         return self._clusters
+
+
+    def clusters_data(self):
+        """ dictionary
+        """
+        cluster_dict={}
+        cluster_dict['input_data']=self.centered_data()
+        cluster_dict['nb_clusters']=len(self.clusters())
+        cluster_dict['clusters']=[
+            self.cluster_data(c) for c in self.clusters()]
+        return cluster_dict
+
+
+
+
+    def cluster_data(self,cluster):
+        """ dictionary
+        """
+        x,y,count=cluster
+        ijs=self._ijs_for_xy(x,y)
+        area=ConvexHull(ijs).area
+        cluster_dict={
+            'x':x,
+            'y':y,
+            'count':count,
+            'area':area,
+            'points':ijs }
+        return cluster_dict
 
 
     #
@@ -102,7 +129,22 @@ class MShift(object):
     def _init_properties(self):
         self._centered_data=None
         self._clustered_data=None
+        self._joined=None
         self._clusters=None
+
+
+    def _joined_data(self):
+        if self._joined is None:
+            self._joined=np.concatenate(
+                (self.clustered_data(),self.centered_data()),axis=-1)
+        return self._joined
+
+
+    def _ijs_for_xy(self,x,y):
+        is_in_cluster=np.logical_and(
+            self._joined_data()[:,0]==x,
+            self._joined_data()[:,1]==y)
+        return self._joined_data()[is_in_cluster][:,2:4]
 
 
     def _gaussian(self,d):
