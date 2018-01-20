@@ -9,15 +9,27 @@ GLAD_START_DATE=datetime.strptime('2015-01-01',DATE_STR_FMT)
 """glad_between_dates
 
 """
-def glad_between_dates(data,start_date,end_date,intensity_only=True):
+def glad_between_dates(data,start_date,end_date,return_days=True,return_intensity=True):
+    """ ...
+    """
     intensity, days=_get_intensity_days(data)
-    days_test=_days_are_between_dates(days,start_date,end_date)
-    if intensity_only:
-        return np.where(days_test,intensity,0)
+    is_between_dates=_days_are_between_dates(days,start_date,end_date)
+    if return_days:
+        if return_intensity:
+            bands=[
+                    _between_dates(is_between_dates,intensity),
+                    _between_dates(is_between_dates,days)]
+            im=np.dstack(bands)
+        else:
+            im=_between_dates(is_between_dates,days)
+    elif return_intensity:
+        im=_between_dates(is_between_dates,intensity)
     else:
-        days_test=np.dstack([days_test,days_test,days_test])
-        return np.where(days_test,data,0)
+        im=is_between_dates.astype(int)
+    return im
 
+def _between_dates(is_between_dates,im):
+    return np.where(is_between_dates,im,0)
 
 def _days_are_between_dates(days,start_date,end_date):
     start_days=_days_since_glad_start(start_date)
@@ -35,9 +47,6 @@ def _get_intensity_days(data):
     days=(255.0 * data[:,:,0]) + data[:,:,1]
     intensity=np.mod(confidence_intensity,100.0)*100.0/55
     return intensity, days
-
-
-
 
 
 
