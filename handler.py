@@ -22,6 +22,7 @@ def meanshift(event, context):
     req=RequestParser(event)
     aws=AWS(req.table_name,req.bucket)
     im_data=_im_data(req,aws)
+    im_data=_preprocess(req,im_data)
     mshift=MShift(
         data=im_data,
         width=req.width,
@@ -35,17 +36,15 @@ def meanshift(event, context):
 
 def _im_data(req,aws):
     if not req.url: aws.s3.download(req.file_name,req.data_path)
-    im_data=io.imread(req.data_path)
+    return io.imread(req.data_path)
+
+
+def _preprocess(req,im_data): 
     if req.preprocess_data:
         im_data=proc.glad_between_dates(
             im_data,
             req.start_date,
             req.end_date)
-    if req.intensity_threshold:
-        im_data=proc.threshold(
-            im_data,
-            threshold=req.intensity_threshold,
-            hard_threshold=req.hard_threshold)
     return im_data
 
 

@@ -6,19 +6,36 @@ DATE_STR_FMT='%Y-%m-%d'
 GLAD_START_DATE=datetime.strptime('2015-01-01',DATE_STR_FMT)
 
 
-"""glad_between_dates
+#
+# GLAD ALERTS
+#
+def glad_between_dates(
+        data,
+        start_date,
+        end_date,
+        return_days=True,
+        return_intensity=False):
+    """ filter glad image by dates
 
-"""
-def glad_between_dates(data,start_date,end_date,return_days=True,return_intensity=True):
-    """ ...
+        Args:
+            data<arr>: glad image
+            start_date<str>: yyyy-mm-dd
+            end_date<str>: yyyy-mm-dd
+            return_days<bool|True>: if true return days-since band
+            return_intensity<bool|False>: if true return intensity bands
+
+        Returns:
+            image with requested bands. note: if both return_days
+            and return_intensity are false it will return an image
+            with 1 if an alert exists between the dates, otherwise 0.
+    
     """
-    intensity, days=_get_intensity_days(data)
+    intensity,days=_get_intensity_days(data)
     is_between_dates=_days_are_between_dates(days,start_date,end_date)
     if return_days:
         if return_intensity:
-            bands=[
-                    _between_dates(is_between_dates,intensity),
-                    _between_dates(is_between_dates,days)]
+            bands=[_between_dates(is_between_dates,intensity),
+                   _between_dates(is_between_dates,days)]
             im=np.dstack(bands)
         else:
             im=_between_dates(is_between_dates,days)
@@ -28,8 +45,10 @@ def glad_between_dates(data,start_date,end_date,return_days=True,return_intensit
         im=is_between_dates.astype(int)
     return im
 
+
 def _between_dates(is_between_dates,im):
     return np.where(is_between_dates,im,0)
+
 
 def _days_are_between_dates(days,start_date,end_date):
     start_days=_days_since_glad_start(start_date)
@@ -50,10 +69,15 @@ def _get_intensity_days(data):
 
 
 
-"""threshold
 
-"""
+#
+# THRESHOLD DATA
+#
 def threshold(data,threshold=0,hard_threshold=False):
+    """
+        if hard_threshold return 1|0 for over|under threshold
+        otherwise set all data under threshold to zero     
+    """
     test=(data>threshold)
     if hard_threshold:
         return test.astype(float)

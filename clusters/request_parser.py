@@ -29,7 +29,6 @@ class RequestParser(object):
         'date_range',
         'timestamp',
         'width',
-        'intensity_threshold',
         'iterations',
         'hard_threshold',
         'min_count',
@@ -50,9 +49,7 @@ class RequestParser(object):
         'date_range',
         'timestamp',
         'width',
-        'intensity_threshold',
         'iterations',
-        'hard_threshold',
         'min_count',
         'downsample']
 
@@ -122,9 +119,7 @@ class RequestParser(object):
             'end_date': env.get('end_date',default=now.strftime("%Y-%m-%d")),
             'timestamp': now.strftime("%Y%m%d::%H:%M:%S"),
             'width': env.int('width'),
-            'intensity_threshold': env.int('intensity_threshold'),
             'iterations': env.int('iterations'),
-            'hard_threshold': env.bool('hard_threshold',default=DEFAULT_HARD_THRESHOLD),
             'min_count': env.int('min_count'),
             'downsample': env.int('downsample'),
             'url': env.get('url',default=None),
