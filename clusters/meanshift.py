@@ -1,7 +1,7 @@
 import math
 import numpy as np
 from clusters.convex_hull import ConvexHull
-
+import clusters.processors as proc
 
 NOISY=False
 WIDTH=15
@@ -39,6 +39,11 @@ class MShift(object):
 
 
     def centered_data(self):
+        """ add indices (centered at origin) to data
+
+            Returns: 
+                array of [i,j,days-since] valued arrays
+        """
         if self._centered_data is None:
             i=np.subtract(INDICES[0],SHIFT)
             j=np.subtract(INDICES[1],SHIFT)
@@ -49,8 +54,8 @@ class MShift(object):
 
 
     def clustered_data(self):
-        """ shift initial i,j values using mean-shift
-            to final x,y value
+        """ shift alert i,j values using mean-shift
+            to final value centroid x,y position
 
             Returns: 
                 array of [x,y] valued arrays
@@ -103,20 +108,22 @@ class MShift(object):
         return cluster_dict
 
 
-
-
     def cluster_data(self,cluster):
         """ dictionary
         """
         x,y,count=cluster
-        ijs=self._ijs_for_xy(x,y)
-        area=ConvexHull(ijs).area
+        ijds=self._ijds_for_xy(x,y)
+        area=ConvexHull(ijds[:,:-1]).area
+        min_date=proc.date_for_days(np.amin(ijds[:,-1]))
+        max_date=proc.date_for_days(np.amax(ijds[:,-1]))
         cluster_dict={
             'x':x,
             'y':y,
             'count':count,
             'area':area,
-            'points':ijs }
+            'max_date':max_date,
+            'min_date':min_date,
+            'alerts':ijds }
         return cluster_dict
 
 
@@ -137,11 +144,11 @@ class MShift(object):
         return self._joined
 
 
-    def _ijs_for_xy(self,x,y):
+    def _ijds_for_xy(self,x,y):
         is_in_cluster=np.logical_and(
             self._joined_data()[:,0]==x,
             self._joined_data()[:,1]==y)
-        return self._joined_data()[is_in_cluster][:,2:4]
+        return self._joined_data()[is_in_cluster][:,2:]
 
 
     def _gaussian(self,d):

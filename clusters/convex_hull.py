@@ -8,9 +8,9 @@ class ConvexHull(object):
     # PUBLIC METHODS
     #
     def __init__(self,points):
-            self.points=points
-            self.hull=self._convex_hull(points)
-            self.area=self._area(self.hull)
+        self.points=points
+        self.hull=self._convex_hull(points)
+        self.area=self._area(self.hull)
 
 
     """ compute convex hull

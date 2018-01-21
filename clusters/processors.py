@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import numpy as np
 
 
 DATE_STR_FMT='%Y-%m-%d'
+INT_DATE_FMT='%Y%m%d'
 GLAD_START_DATE=datetime.strptime('2015-01-01',DATE_STR_FMT)
 
 
@@ -44,6 +45,11 @@ def glad_between_dates(
     else:
         im=is_between_dates.astype(int)
     return im
+
+
+def date_for_days(days):
+    date=(GLAD_START_DATE+timedelta(days=days))
+    return int(date.strftime(INT_DATE_FMT))
 
 
 def _between_dates(is_between_dates,im):

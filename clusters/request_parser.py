@@ -119,7 +119,6 @@ class RequestParser(object):
             'width': env.int('width'),
             'iterations': env.int('iterations'),
             'min_count': env.int('min_count'),
-            'downsample': env.int('downsample'),
             'url': env.get('url',default=None),
             'table_name': env.get('table'),
             'bucket': env.get('bucket',default=None),
