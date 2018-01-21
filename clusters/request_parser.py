@@ -32,7 +32,6 @@ class RequestParser(object):
         'iterations',
         'hard_threshold',
         'min_count',
-        'downsample',
         'table_name',
         'bucket',
         'data_path',
@@ -50,8 +49,7 @@ class RequestParser(object):
         'timestamp',
         'width',
         'iterations',
-        'min_count',
-        'downsample']
+        'min_count']
 
 
     #

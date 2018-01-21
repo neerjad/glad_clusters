@@ -7,7 +7,6 @@ NOISY=False
 WIDTH=15
 MIN_COUNT=6
 ITERATIONS=25
-DOWNSAMPLE=False
 SIZE=256
 INDICES=np.indices((SIZE,SIZE))
 SHIFT=(SIZE-1)/2.0
@@ -31,13 +30,11 @@ class MShift(object):
             data,
             width=WIDTH,
             min_count=MIN_COUNT,
-            iterations=ITERATIONS,
-            downsample=DOWNSAMPLE):
+            iterations=ITERATIONS):
         self.data=data
         self.width=width
         self.min_count=min_count
         self.iterations=iterations
-        self.downsample=downsample
         self._init_properties()
 
 

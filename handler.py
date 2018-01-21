@@ -6,6 +6,8 @@ from clusters.meanshift import MShift
 from clusters.request_parser import RequestParser
 import clusters.processors as proc
 from clusters.aws import AWS
+
+
 #
 # LOGGING CONFIG
 #
@@ -27,8 +29,7 @@ def meanshift(event, context):
         data=im_data,
         width=req.width,
         min_count=req.min_count,
-        iterations=req.iterations,
-        downsample=req.downsample)
+        iterations=req.iterations)
     output_data=_output_data(req,mshift)
     aws.db.put(output_data)
     return _process_response(event,output_data)
