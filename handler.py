@@ -51,9 +51,10 @@ def _preprocess(req,im_data):
 
 def _output_data(req,mshift):
     data=req.data()
-    data['input_data']=MShift.zero_shifted_list(mshift.centered_data())
-    data['clusters']=MShift.zero_shifted_list(mshift.clusters())
-    data['nb_clusters']=len(data['clusters'])
+    data['clusters_data']=mshift.clusters_data()
+    # data['input_data']=MShift.zero_shifted_list(mshift.centered_data())
+    # data['clusters']=MShift.zero_shifted_list(mshift.clusters())
+    # data['nb_clusters']=len(data['clusters'])
     return data
 
 
