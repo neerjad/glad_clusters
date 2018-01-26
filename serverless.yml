@@ -46,7 +46,7 @@ package:
   exclude:
     - venv/**
     - notebooks/**
-    - helpers/**
+    - utils/**
     - local_env.py
 
 functions:
