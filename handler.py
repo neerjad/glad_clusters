@@ -32,7 +32,7 @@ def meanshift(event, context):
         iterations=req.iterations)
     output_data=_output_data(req,mshift)
     aws.db.put(output_data)
-    return _process_response(event,output_data)
+    return output_data
 
 
 def _im_data(req,aws):
@@ -51,10 +51,7 @@ def _preprocess(req,im_data):
 
 def _output_data(req,mshift):
     data=req.data()
-    data['clusters_data']=mshift.clusters_data()
-    # data['input_data']=MShift.zero_shifted_list(mshift.centered_data())
-    # data['clusters']=MShift.zero_shifted_list(mshift.clusters())
-    # data['nb_clusters']=len(data['clusters'])
+    data['data']=mshift.clusters_data()
     return data
 
 

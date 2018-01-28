@@ -30,7 +30,7 @@ sls deploy -v
 sls deploy function -f meanshift
 
 # invoke test (with logs)
-sls invoke -f meanshift -l -d '{"file":"gc7"}'
+sls invoke -f meanshift -l -d '{"z":12,"x":1355,"y":2045,"start_date":"2016-06-01","end_date":"2016-12-01"}'
 ```
 
 
