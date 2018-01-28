@@ -100,7 +100,7 @@ class MShift(object):
         """ dictionary
         """
         cluster_dict={}
-        cluster_dict['input_data']=self.ij_data()
+        cluster_dict['input_data']=self.ij_data().astype(int).tolist()
         cluster_dict['nb_clusters']=len(self.clusters())
         cluster_dict['clusters']=[
             self.cluster_data(c) for c in self.clusters()]
@@ -119,10 +119,10 @@ class MShift(object):
             'i':i,
             'j':j,
             'count':count,
-            'area':area,
+            'area':int(round(area)),
             'max_date':max_date,
             'min_date':min_date,
-            'alerts':alerts }
+            'alerts':alerts.astype(int).tolist() }
         return cluster_dict
 
 
