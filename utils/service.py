@@ -46,6 +46,8 @@ VIEW_COLUMNS=[
 
 ERROR_COLUMNS=[
     'z','x','y',
+    'centroid_latitude',
+    'centroid_longitude',
     'error']
 
 
@@ -374,7 +376,6 @@ class ClusterService(object):
 
 
     def _error_row(self,response):
-        rrows=[]
         z=int(response.get('z'))
         x=int(response.get('x'))
         y=int(response.get('y'))

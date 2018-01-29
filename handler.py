@@ -37,7 +37,11 @@ def meanshift(event, context):
 
 def _im_data(req,aws):
     if not req.url: aws.s3.download(req.file_name,req.data_path)
-    return io.imread(req.data_path)
+    try:
+        return io.imread(req.data_path)
+    except Exception as e:
+        logger.warn(
+            "\nfailed to read image ({}) -- {}".format(req.data_path,e))
 
 
 def _preprocess(req,im_data): 
