@@ -80,7 +80,6 @@ class ClusterService(object):
         """ fetch clusters from dynamodb 
         """
         db=boto3.resource('dynamodb')
-        print(self.table)
         table=db.Table(self.table)
         if key:
             self.responses=[table.get_item(Key=key)]
@@ -212,6 +211,15 @@ class ClusterService(object):
             db_filter &= Attr('width').eq(self.width)
         if self.iterations:
             db_filter &= Attr('iterations').eq(self.iterations)
+        if self.x and self.y:
+            db_filter &= Attr('x').eq(self.x)
+            db_filter &= Attr('y').eq(self.y)
+        if self.x_min and self.x_max:
+            db_filter &= Attr('x').gte(self.x_min)
+            db_filter &= Attr('x').lte(self.x_max)
+        if self.y_min and self.y_max:
+            db_filter &= Attr('y').gte(self.y_min)
+            db_filter &= Attr('y').lte(self.y_max)
         return db_filter
 
 
