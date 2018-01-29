@@ -34,14 +34,14 @@ DATAFRAME_COLUMNS=[
 
 
 VIEW_COLUMNS=[
-    'timestamp',
     'count',
     'area',
     'min_date',
     'max_date',
     'latitude',
     'longitude',
-    'x','y']
+    'x','y',
+    'timestamp']
 
 
 class ClusterService(object):
