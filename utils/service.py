@@ -44,6 +44,11 @@ VIEW_COLUMNS=[
     'timestamp']
 
 
+ERROR_COLUMNS=[
+    'z','x','y',
+    'error']
+
+
 class ClusterService(object):
 
 
@@ -326,7 +331,7 @@ class ClusterService(object):
             columns=DATAFRAME_COLUMNS)
         self._error_dataframe=pd.DataFrame(
             error_rows, 
-            columns=DATAFRAME_COLUMNS)
+            columns=ERROR_COLUMNS)
         self._dataframe.sort_values(
             'timestamp',
             ascending=False,
