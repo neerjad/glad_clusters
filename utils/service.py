@@ -51,7 +51,7 @@ ERROR_COLUMNS=[
     'centroid_latitude',
     'centroid_longitude',
     'error',
-    'error_type']
+    'error_trace']
 
 
 BOTO3_CONFIG={
@@ -334,7 +334,7 @@ class ClusterService(object):
                 error_data=self._request_data(x,y,as_dict=True)
                 error_data['data']={}
                 error_data['error']="{}".format(e)
-                error_data['error_type']="service"
+                error_data['error_trace']="service"
                 return error_data
 
 
@@ -389,7 +389,7 @@ class ClusterService(object):
 
 
     def _error_row(self,error,response):
-        error_type=response.get('error_type','lambda')
+        error_trace=response.get('error_trace','lambda')
         z=response.get('z')
         x=response.get('x')
         y=response.get('y')
@@ -398,7 +398,7 @@ class ClusterService(object):
             lon=self._lon(int(z),int(x),int(y),128,128)
         else:
             lat,lon=None,None
-        return [z,x,y,lat,lon,error,error_type]
+        return [z,x,y,lat,lon,error,error_trace]
 
 
     def _not_none(self,values):

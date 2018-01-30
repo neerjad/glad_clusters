@@ -24,15 +24,21 @@ def meanshift(event, context):
     req=RequestParser(event)
     aws=AWS(req.table_name,req.bucket)
     im_data=_im_data(req,aws)
-    im_data=_preprocess(req,im_data)
-    mshift=MShift(
-        data=im_data,
-        width=req.width,
-        min_count=req.min_count,
-        iterations=req.iterations)
-    output_data=_output_data(req,mshift)
-    aws.db.put(output_data)
-    return output_data
+    if im_data is None:
+        return {
+            'error':'{} not found'.format(req.data_path)
+            'error_trace':'handler'}
+    else:
+        im_data=_preprocess(req,im_data)
+        mshift=MShift(
+            data=im_data,
+            width=req.width,
+            min_count=req.min_count,
+            iterations=req.iterations)
+        output_data=_output_data(req,mshift)
+        print('OUT',output_data)
+        aws.db.put(output_data)
+        return output_data
 
 
 def _im_data(req,aws):
@@ -42,6 +48,7 @@ def _im_data(req,aws):
     except Exception as e:
         logger.warn(
             "\nfailed to read image ({}) -- {}".format(req.data_path,e))
+        return False
 
 
 def _preprocess(req,im_data): 
