@@ -4,6 +4,7 @@ import itertools
 import json
 import boto3
 from boto3.dynamodb.conditions import Attr
+from boto3.session import Config
 import numpy as np
 import pandas as pd
 import utils.multiprocess as mp
@@ -17,6 +18,7 @@ DEFAULT_ITERATIONS=25
 DEFAULT_ZOOM=12
 DELETE_RESPONSES=False
 DEFAULT_TABLE=os.environ.get('table')
+
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
 
 DATAFRAME_COLUMNS=[
@@ -48,7 +50,13 @@ ERROR_COLUMNS=[
     'z','x','y',
     'centroid_latitude',
     'centroid_longitude',
-    'error']
+    'error',
+    'error_type']
+
+
+BOTO3_CONFIG={
+    'read_timeout': 600
+}
 
 
 class ClusterService(object):
@@ -107,7 +115,7 @@ class ClusterService(object):
                   else:
                     use multiprocessing
         """
-        self.lambda_client=boto3.client('lambda')
+        self.lambda_client=boto3.client('lambda',config=Config(**BOTO3_CONFIG))
         if (self.x and self.y):
             self.responses=[self._run_tile()]
         else:
@@ -292,8 +300,11 @@ class ClusterService(object):
         return lon
 
 
-    def _process_response(self,response):
-        return json.loads(response['Payload'].read())
+    def _process_response(self,x,y,response):
+        response=json.loads(response.get('Payload',{}).read())
+        request=self._request_data(x,y,as_dict=True)
+        request.update(response)
+        return request
 
 
     def _run_tile(self,location=None,x=None,y=None):
@@ -318,11 +329,12 @@ class ClusterService(object):
                     InvocationType='RequestResponse',
                     LogType='Tail',
                     Payload=self._request_data(x,y))
-                return self._process_response(response)
+                return self._process_response(x,y,response)
             except Exception as e:
                 error_data=self._request_data(x,y,as_dict=True)
                 error_data['data']={}
                 error_data['error']="{}".format(e)
+                error_data['error_type']="service"
                 return error_data
 
 
@@ -345,9 +357,10 @@ class ClusterService(object):
         rows=[]
         error_rows=[]
         for response in self.responses:
-            if response.get('error'):
-                error_rows.append(self._error_row(response))
-            if response:
+            error=response.get('error') or response.get('errorMessage')
+            if error:
+                error_rows.append(self._error_row(error,response))
+            else:
                 rows+=self._response_rows(response)
         return rows,error_rows
 
@@ -375,14 +388,17 @@ class ClusterService(object):
         return rrows
 
 
-    def _error_row(self,response):
-        z=int(response.get('z'))
-        x=int(response.get('x'))
-        y=int(response.get('y'))
-        error=response['error']
-        lat=self._lat(z,x,y,128,128)
-        lon=self._lon(z,x,y,128,128)
-        return [z,x,y,lat,lon,error]
+    def _error_row(self,error,response):
+        error_type=response.get('error_type','lambda')
+        z=response.get('z')
+        x=response.get('x')
+        y=response.get('y')
+        if (z and x and y):
+            lat=self._lat(int(z),int(x),int(y),128,128)
+            lon=self._lon(int(z),int(x),int(y),128,128)
+        else:
+            lat,lon=None,None
+        return [z,x,y,lat,lon,error,error_type]
 
 
     def _not_none(self,values):
