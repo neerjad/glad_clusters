@@ -60,8 +60,6 @@ BOTO3_CONFIG={
 
 
 class ClusterService(object):
-
-
     #
     #  PUBLC METHODS
     #    
@@ -202,6 +200,7 @@ class ClusterService(object):
             return row[VIEW_COLUMNS]
         else:
             return row
+
 
 
     #
@@ -350,6 +349,8 @@ class ClusterService(object):
             'timestamp',
             ascending=False,
             inplace=True)
+        self._dataframe.reset_index(inplace=True)
+        self._error_dataframe.reset_index(inplace=True)
         if DELETE_RESPONSES: self.responses=None
 
 
@@ -404,5 +405,9 @@ class ClusterService(object):
     def _not_none(self,values):
         test=[ (val is not None) for val in values ]
         return np.prod(test).astype(bool)
+
+
+
+
 
 

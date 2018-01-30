@@ -24,9 +24,9 @@ def meanshift(event, context):
     req=RequestParser(event)
     aws=AWS(req.table_name,req.bucket)
     im_data=_im_data(req,aws)
-    if im_data is None:
+    if im_data is False:
         return {
-            'error':'{} not found'.format(req.data_path)
+            'error':'{} not found'.format(req.data_path),
             'error_trace':'handler'}
     else:
         im_data=_preprocess(req,im_data)
