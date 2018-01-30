@@ -1,8 +1,80 @@
 # MEAN SHIFT CLUSTERING FOR AWS LAMBDA
 
-Initial Hacks at clustering with AWS Lambda
+_Clustering with AWS Lambda_
+
+User interaction happens through two main classes:  `ClusterService`, used to run the clustering algorithm, and `ClusterViewer`  used display the data received in a python notebook. _TODO: There is also a command-line-interface for running the clustering algorithm and saving the responses to csv files_
+
 
 ---
+## ClusterService
+
+```
+from utils.service import ClusterService
+
+# initialize by tile-x,y bounds
+c=ClusterService(tile_bounds=[[1355,2045],[1356,2046]])
+
+# check the number of tiles you are about to run
+c.request_size()
+
+# run by tile x,y values
+%time c.run()
+
+# or fetch the data from a previous run
+%time c.fetch()
+
+# the results as dataframe
+c.view().head()
+
+# sort results by 'area' in descending order 
+c.view().sort_values('area',ascending=False).head()
+
+# the full-results as dataframe (including input data and initial points)
+c.dataframe().head()
+
+# errors that may have occurred 
+c.errors().head()
+
+# a particular row
+c.cluster(row_id=row_id)
+
+# a particular full-row
+c.cluster(row_id=row_id,as_view=False)
+```
+
+
+---
+## ClusterViewer
+
+```
+from utils.service import ClusterService
+from utils.viewer import ClusterViewer
+%matplotlib inline
+
+# get data
+c=ClusterService(tile_bounds=[[1355,2045],[1356,2046]])
+%time c.fetch()
+c.view().head()
+
+# initialize viewer
+view=ClusterViewer(c)
+    
+# view input data for row 182
+view.tile(182)
+
+# view cluster for row 182
+view.cluster(182)
+
+# view clusters 182,4,185,6 in a single row 
+view.clusters(row_ids=[82,3,184,6])
+
+# view clusters 182 through 184 in a single row
+view.clusters(start=182,end=185)
+```
+
+---
+## DEVELOPMENT
+
 ##### SERVERLESS
 
 We use [serverless](https://serverless.com/)
@@ -17,7 +89,9 @@ RUN LOCAL TESTS:
 
 ```bash
 source deactivate
-python handler.py '{"file":"gc7"}'
+python local_env.py dev
+
+python handler.py '{"z":12,"x":1355,"y":2045,"start_date":"2016-06-01","end_date":"2016-12-01"}'
 ```
 
 ---
@@ -37,28 +111,7 @@ sls invoke -f meanshift -l -d '{"z":12,"x":1355,"y":2045,"start_date":"2016-06-0
 ---
 ##### NOTES
 
----
-###### TABLE DATA:
-
-- CLUSTER DATA
-    + location (tile: i,j)
-    + number of alerts
-    + area of convexhull
-    + max/min date of alerts
-    + original alert locations
-- RUN SPECS
-    + max/min date
-    + threshold
-    + width
-    + min_count
-    + x/y/z
-    + optional
-        * hard threshold
-        * intensity threshold
-        * iterations
-- OTHER OPTIONAL
-    + file_name
-    + input_data
+_nothing to see here_
 
 
 
