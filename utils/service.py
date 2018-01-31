@@ -58,8 +58,77 @@ BOTO3_CONFIG={
     'read_timeout': 600
 }
 
+WUP_SCALE=200
+RUP_SCALE=200
+WDOWN_SCALE=5
+RDOWN_SCALE=5
+MAX_PROCESSES=100
 
 class ClusterService(object):
+
+    @staticmethod
+    def scale(
+            write=None,
+            read=None,
+            wup=False,
+            rup=False,
+            up=False,
+            down=False,
+            table=None,
+            aws_response=False):
+        """ update read/write capcity for table 
+
+            Args:
+                write<int>: Write Capacity **MUST BE USED WITH 'read'**
+                read<int>: Read Capacity **MUST BE USED WITH 'write'**
+                wup<bool>: Scale-Up Write
+                rup<bool>: Scale-Up Read
+                up<bool>: Scale-Up Write and Read
+                down<bool>: Scale-Down Write and Read
+                table<str>: TableName defaults to eviron['table']
+        """
+        if not table: table=os.environ['table']
+        config={}
+        if write and read:
+            config['ReadCapacityUnits']=read
+            config['WriteCapacityUnits']=write
+        elif wup:
+            config['ReadCapacityUnits']=RDOWN_SCALE
+            config['WriteCapacityUnits']=WUP_SCALE
+        elif rup:
+            config['ReadCapacityUnits']=RUP_SCALE
+            config['WriteCapacityUnits']=WDOWN_SCALE
+        elif up:
+            config['ReadCapacityUnits']=RUP_SCALE
+            config['WriteCapacityUnits']=WUP_SCALE
+        elif down:
+            config['ReadCapacityUnits']=RDOWN_SCALE
+            config['WriteCapacityUnits']=WDOWN_SCALE
+        db_client=boto3.client('dynamodb')
+        try:
+            aws_resp=db_client.update_table(
+                    TableName=table,
+                    ProvisionedThroughput=config)
+            if aws_response:
+                return aws_resp
+            else:
+                return ClusterService.status(table)
+        except Exception as e:
+            return "SCALE_FAILURE: {}".format(e)
+
+
+    @staticmethod
+    def status(table=None):
+        """ get table status 
+
+            Args:
+                table<str>: TableName defaults to eviron['table']
+        """
+        if not table: table=os.environ['table']
+        db=boto3.resource('dynamodb')
+        return db.Table(table).table_status
+
+
     #
     #  PUBLC METHODS
     #    
@@ -85,9 +154,10 @@ class ClusterService(object):
         self.iterations=iterations
         self.z=z
         self._N=(2**self.z)
-        self.table=table
+        self.table=table or os.environ['table']
         self._set_tile_bounds(bounds,tile_bounds,lat,lon,x,y)
         
+
 
     def fetch(self,key=None,query=None,**kwargs):
         """ fetch clusters from dynamodb 
@@ -105,7 +175,7 @@ class ClusterService(object):
             self.responses=rows.get('Items')
 
 
-    def run(self):
+    def run(self,max_processes=MAX_PROCESSES):
         """ find clusters on tiles
         
             NOTE: if (self.x and self.y): 
@@ -120,7 +190,10 @@ class ClusterService(object):
             xys=itertools.product(
                 range(self.x_min,self.x_max+1),
                 range(self.y_min,self.y_max+1))
-            self.responses=mp.map_with_threadpool(self._run_tile,list(xys))
+            self.responses=mp.map_with_threadpool(
+                self._run_tile,
+                list(xys),
+                max_processes=max_processes)
 
     
     def request_size(self):
@@ -368,24 +441,25 @@ class ClusterService(object):
 
     def _response_rows(self,response):
         rrows=[]
-        z=int(response.get('z'))
-        x=int(response.get('x'))
-        y=int(response.get('y'))
-        for cluster in response.get('data',{}).get('clusters',[]):
-            i=int(cluster.get('i'))
-            j=int(cluster.get('j'))
-            rrows.append([
-                    int(cluster.get('count')),
-                    int(cluster.get('area')),
-                    cluster.get('min_date'),
-                    cluster.get('max_date'),
-                    self._lat(z,x,y,i,j),
-                    self._lon(z,x,y,i,j),
-                    z,x,y,i,j,
-                    response['file_name'],
-                    response['timestamp'],
-                    np.array(cluster.get('alerts')).astype(int),
-                    np.array(response['data']['input_data']).astype(int)])
+        if response:
+            z=int(response.get('z'))
+            x=int(response.get('x'))
+            y=int(response.get('y'))
+            for cluster in response.get('data',{}).get('clusters',[]):
+                i=int(cluster.get('i'))
+                j=int(cluster.get('j'))
+                rrows.append([
+                        int(cluster.get('count')),
+                        int(cluster.get('area')),
+                        cluster.get('min_date'),
+                        cluster.get('max_date'),
+                        self._lat(z,x,y,i,j),
+                        self._lon(z,x,y,i,j),
+                        z,x,y,i,j,
+                        response['file_name'],
+                        response['timestamp'],
+                        np.array(cluster.get('alerts')).astype(int),
+                        np.array(response['data']['input_data']).astype(int)])
         return rrows
 
 

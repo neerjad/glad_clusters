@@ -35,10 +35,12 @@ def meanshift(event, context):
             width=req.width,
             min_count=req.min_count,
             iterations=req.iterations)
-        output_data=_output_data(req,mshift)
-        print('OUT',output_data)
-        aws.db.put(output_data)
-        return output_data
+        output_data, nb_clusters=_output_data(req,mshift)
+        if nb_clusters>0: 
+            aws.db.put(output_data)
+            return output_data
+        else:
+            return None
 
 
 def _im_data(req,aws):
@@ -62,8 +64,10 @@ def _preprocess(req,im_data):
 
 def _output_data(req,mshift):
     data=req.data()
-    data['data']=mshift.clusters_data()
-    return data
+    data['data']=mshift.clusters_data() or {}
+    nb_clusters=data.pop('nb_clusters',0)
+    data['nb_clusters']=nb_clusters
+    return data, nb_clusters
 
 
 def _process_response(event,output_data):

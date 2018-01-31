@@ -3,17 +3,18 @@ from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool
 
 
-MAX_PROCESSES=8
+MAX_POOL_PROCESSES=8
+MAX_THREADPOOL_PROCESSES=64
 
 
-def map_with_pool(data_load_func,jobs_list,max_processes=MAX_PROCESSES):
+def map_with_pool(data_load_func,jobs_list,max_processes=MAX_POOL_PROCESSES):
   pool=Pool(processes=min(len(jobs_list),max_processes))
   dfs=_run_procs(pool,data_load_func,jobs_list)
   _stop_pool(pool)
   return dfs.get()
 
 
-def map_with_threadpool(data_load_func,jobs_list,max_processes=MAX_PROCESSES):
+def map_with_threadpool(data_load_func,jobs_list,max_processes=MAX_THREADPOOL_PROCESSES):
   pool=ThreadPool(processes=min(len(jobs_list),max_processes))
   dfs=_run_procs(pool,data_load_func,jobs_list)
   _stop_pool(pool)
