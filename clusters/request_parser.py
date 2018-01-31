@@ -5,11 +5,9 @@ import re
 #
 #   CONSTANTS
 #
+DEFAULT_ZOOM=12
 DEFAULT_START_DATE='2015-01-01'
-DEFAULT_Z=5
 DEFAULT_DOWNLOAD_FOLDER='/tmp'
-DEFAULT_HARD_THRESHOLD=False
-DEFAULT_INTENSITY_THRESHOLD=100
 DEFAULT_PREPROCESS_DATA=True
 
 #
@@ -30,7 +28,6 @@ class RequestParser(object):
         'timestamp',
         'width',
         'iterations',
-        'hard_threshold',
         'min_count',
         'table_name',
         'bucket',
@@ -112,7 +109,7 @@ class RequestParser(object):
     def _get_default_properties():
         now=datetime.now()
         return {
-            'z': env.int('z',default=DEFAULT_Z),
+            'z': env.int('z',default=DEFAULT_ZOOM),
             'start_date': env.get('start_date',default=DEFAULT_START_DATE),
             'end_date': env.get('end_date',default=now.strftime("%Y-%m-%d")),
             'timestamp': now.strftime("%Y%m%d::%H:%M:%S"),
