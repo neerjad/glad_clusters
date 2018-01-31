@@ -65,7 +65,7 @@ def _preprocess(req,im_data):
 def _output_data(req,mshift):
     data=req.data()
     data['data']=mshift.clusters_data() or {}
-    nb_clusters=data.pop('nb_clusters',0)
+    nb_clusters=data['data'].pop('nb_clusters',0)
     data['nb_clusters']=nb_clusters
     return data, nb_clusters
 
