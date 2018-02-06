@@ -246,7 +246,31 @@ class ClusterService(object):
 
     
     def request_size(self):
+        """ get number of requests
+        """
         return (self.x_max-self.x_min+1)*(self.y_max-self.y_min+1)
+
+
+    def bounds(self):
+        """ get lat/lon-bounds
+        """
+        lat_min=self._lat(self.z,self.x_min,self.y_min,0,0)
+        lat_max=self._lat(self.z,self.x_max,self.y_max,0,0)
+        lon_min=self._lon(self.z,self.x_min,self.y_min,0,0)
+        lon_max=self._lon(self.z,self.x_max,self.y_max,0,0)
+        return [[lat_min,lon_min],[lat_max,lon_max]]
+
+
+    def bounding_box(self):
+        """ get lat/lon bounding box
+        """
+        mins,maxes=self.bounds()
+        return [
+            [mins[0],mins[1]],
+            [maxes[0],mins[1]],
+            [maxes[0],maxes[1]],
+            [mins[0],maxes[1]],
+            [mins[0],mins[1]]]
 
 
     def dataframe(self):
@@ -424,10 +448,10 @@ class ClusterService(object):
     def _process_response(self,x,y,response):
         if response:
             payload=json.loads(response.get('Payload',{}).read())
+            processed_response=self._request_data(x,y,as_dict=True)
             if payload:
-                response=self._request_data(x,y,as_dict=True)
-                response.update(payload)
-                return payload
+                processed_response.update(payload)
+            return processed_response
         return None
 
 
