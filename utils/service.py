@@ -1,4 +1,5 @@
 import os
+from time import sleep
 import math
 import itertools
 import json
@@ -8,6 +9,7 @@ from boto3.session import Config
 import numpy as np
 import pandas as pd
 import utils.multiprocess as mp
+from pprint import pprint
 
 
 DEFAULT_START_DATE='2015-01-01'
@@ -18,6 +20,8 @@ DEFAULT_ITERATIONS=25
 DEFAULT_ZOOM=12
 DELETE_RESPONSES=False
 DEFAULT_TABLE=os.environ.get('table')
+DEFAULT_BATCH_SIZE=100
+LISTEN_WAIT=1.0
 
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
 
@@ -75,6 +79,8 @@ class ClusterService(object):
             up=False,
             down=False,
             table=None,
+            listen=True,
+            noisy=True,
             aws_response=False):
         """ update read/write capcity for table 
 
@@ -86,6 +92,8 @@ class ClusterService(object):
                 up<bool>: Scale-Up Write and Read
                 down<bool>: Scale-Down Write and Read
                 table<str>: TableName defaults to eviron['table']
+                listen<bool>: Wait for status to be "Active"
+                noisy<bool>: Print "..." while waiting
         """
         if not table: table=os.environ['table']
         config={}
@@ -111,10 +119,26 @@ class ClusterService(object):
                     ProvisionedThroughput=config)
             if aws_response:
                 return aws_resp
+            elif listen:
+                return ClusterService.listen(table,noisy)
             else:
                 return ClusterService.status(table)
         except Exception as e:
-            return "SCALE_FAILURE: {}".format(e)
+            return "WARNING: {}".format(e)
+
+
+    @staticmethod
+    def listen(table=None,noisy=True):
+        """ Wait for status "Active"
+
+            Args:
+                table<str>: TableName defaults to eviron['table']
+                noisy<bool>: Print "..." while waiting
+        """
+        while ClusterService.status(table)!=u'ACTIVE':
+            if noisy: print('...')
+            sleep(LISTEN_WAIT)
+        return True
 
 
     @staticmethod
@@ -173,6 +197,33 @@ class ClusterService(object):
                 filter_expression=self._build_filter()
             rows=table.scan(FilterExpression=filter_expression)
             self.responses=rows.get('Items')
+
+
+    def batch_run(self,batch_size=DEFAULT_BATCH_SIZE,max_processes=MAX_PROCESSES):
+        """ find clusters on tiles
+        
+            NOTE: if (self.x and self.y): 
+                    pass directly to _run_tile
+                  else:
+                    use multiprocessing
+        """
+        self.lambda_client=boto3.client('lambda',config=Config(**BOTO3_CONFIG))
+        self.responses=[]
+        xys=list(itertools.product(
+            range(self.x_min,self.x_max+1),
+            range(self.y_min,self.y_max+1)))
+        self._nb_batches=math.ceil(len(xys)/batch_size)
+        self._batch_index=0
+        while self._batch_index<self._nb_batches:
+            start=self._batch_index*batch_size
+            end=start+batch_size
+            self.responses+=mp.map_with_threadpool(
+                self._run_tile,
+                list(xys[start:end]),
+                max_processes=max_processes)
+            self._batch_index+=1
+            print(self._batch_index,start,end)
+
 
 
     def run(self,max_processes=MAX_PROCESSES):
@@ -373,10 +424,13 @@ class ClusterService(object):
 
 
     def _process_response(self,x,y,response):
-        response=json.loads(response.get('Payload',{}).read())
-        request=self._request_data(x,y,as_dict=True)
-        request.update(response)
-        return request
+        if response:
+            payload=json.loads(response.get('Payload',{}).read())
+            if payload:
+                response=self._request_data(x,y,as_dict=True)
+                response.update(payload)
+                return payload
+        return None
 
 
     def _run_tile(self,location=None,x=None,y=None):
@@ -431,35 +485,35 @@ class ClusterService(object):
         rows=[]
         error_rows=[]
         for response in self.responses:
-            error=response.get('error') or response.get('errorMessage')
-            if error:
-                error_rows.append(self._error_row(error,response))
-            else:
-                rows+=self._response_rows(response)
+            if response:
+                error=response.get('error') or response.get('errorMessage')
+                if error:
+                    error_rows.append(self._error_row(error,response))
+                else:
+                    rows+=self._response_rows(response)
         return rows,error_rows
 
 
     def _response_rows(self,response):
         rrows=[]
-        if response:
-            z=int(response.get('z'))
-            x=int(response.get('x'))
-            y=int(response.get('y'))
-            for cluster in response.get('data',{}).get('clusters',[]):
-                i=int(cluster.get('i'))
-                j=int(cluster.get('j'))
-                rrows.append([
-                        int(cluster.get('count')),
-                        int(cluster.get('area')),
-                        cluster.get('min_date'),
-                        cluster.get('max_date'),
-                        self._lat(z,x,y,i,j),
-                        self._lon(z,x,y,i,j),
-                        z,x,y,i,j,
-                        response['file_name'],
-                        response['timestamp'],
-                        np.array(cluster.get('alerts')).astype(int),
-                        np.array(response['data']['input_data']).astype(int)])
+        z=int(response.get('z'))
+        x=int(response.get('x'))
+        y=int(response.get('y'))
+        for cluster in response.get('data',{}).get('clusters',[]):
+            i=int(cluster.get('i'))
+            j=int(cluster.get('j'))
+            rrows.append([
+                    int(cluster.get('count')),
+                    int(cluster.get('area')),
+                    cluster.get('min_date'),
+                    cluster.get('max_date'),
+                    self._lat(z,x,y,i,j),
+                    self._lon(z,x,y,i,j),
+                    z,x,y,i,j,
+                    response['file_name'],
+                    response['timestamp'],
+                    np.array(cluster.get('alerts')).astype(int),
+                    np.array(response['data']['input_data']).astype(int)])
         return rrows
 
 
