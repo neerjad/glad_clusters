@@ -83,7 +83,7 @@ class MShift(object):
                 array of [i,j,count] valued arrays
         """
         if self._clusters is None:
-            if not self.clustered_data():
+            if self.clustered_data().shape[0]==0:
                 self._clusters=[]
             else:
                 points,counts=np.unique(

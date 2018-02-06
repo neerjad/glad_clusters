@@ -28,13 +28,13 @@ logger.setLevel(logging.INFO)
 def meanshift(event, context):
     req=RequestParser(event)
     if req.is_not_valid():
-        return _error(req,'request not valid')
+        return _error(req,'request not valid',1)
     else:
         try:
             aws=AWS(req.table_name,req.bucket)
             im_data=_im_data(req,aws)
             if im_data is False:
-                return _error(req,'{} not found'.format(req.data_path))
+                return _error(req,'{} not found'.format(req.data_path),2)
             else:
                 im_data=_preprocess(req,im_data)
                 mshift=MShift(
@@ -51,7 +51,7 @@ def meanshift(event, context):
                 else:
                     return None
         except Exception as e:
-            return _error(req,'Exception: {}'.format(e))
+            return _error(req,'Exception: {}'.format(e),3)
 
 
 
@@ -82,8 +82,8 @@ def _output_data(req,mshift):
     return data, nb_clusters
 
 
-def _error(req,msg):
-    error={ 'error': msg, 'error_trace':'handler' }
+def _error(req,msg,trace_id):
+    error={ 'error': msg, 'error_trace':'handler.{}'.format(trace_id) }
     error.update(req.data())
     return error
 
