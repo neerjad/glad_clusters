@@ -58,6 +58,13 @@ class RequestParser(object):
         self._update_properties()
 
 
+    def is_not_valid(self):
+        return (
+            (self.x is None) or
+            (self.y is None) or
+            (not self.z))
+                  
+
     def data(self):
         return {prop: getattr(self,prop) for prop in self.DATA_PROPERTIES}
 

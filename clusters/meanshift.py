@@ -58,7 +58,7 @@ class MShift(object):
             Returns: 
                 array of [i,j] valued arrays
         """
-        if self._clustered_data is None:   
+        if self._clustered_data is None:
             cdata=self.ij_data()[:,:2].copy()
             cdata=np.subtract(cdata,SHIFT)
             for n in range(self.iterations):
@@ -82,17 +82,20 @@ class MShift(object):
             Returns: 
                 array of [i,j,count] valued arrays
         """
-        if self._clusters is None:   
-            points,counts=np.unique(
-                self.clustered_data(),
-                axis=0,
-                return_counts=True)
-            counts=np.expand_dims(counts,axis=-1)
-            self._clusters=np.concatenate(
-                (points,counts),
-                axis=-1)
-            self._clusters=self._clusters[
-                self._clusters[:,-1]>=self.min_count]
+        if self._clusters is None:
+            if not self.clustered_data():
+                self._clusters=[]
+            else:
+                points,counts=np.unique(
+                    self.clustered_data(),
+                    axis=0,
+                    return_counts=True)
+                counts=np.expand_dims(counts,axis=-1)
+                self._clusters=np.concatenate(
+                    (points,counts),
+                    axis=-1)
+                self._clusters=self._clusters[
+                    self._clusters[:,-1]>=self.min_count]
         return self._clusters
 
 

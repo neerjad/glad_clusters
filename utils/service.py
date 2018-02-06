@@ -20,7 +20,7 @@ DEFAULT_ITERATIONS=25
 DEFAULT_ZOOM=12
 DELETE_RESPONSES=False
 DEFAULT_TABLE=os.environ.get('table')
-DEFAULT_BATCH_SIZE=100
+DEFAULT_BATCH_SIZE=200
 LISTEN_WAIT=1.0
 
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
@@ -200,12 +200,10 @@ class ClusterService(object):
 
 
     def batch_run(self,batch_size=DEFAULT_BATCH_SIZE,max_processes=MAX_PROCESSES):
-        """ find clusters on tiles
-        
-            NOTE: if (self.x and self.y): 
-                    pass directly to _run_tile
-                  else:
-                    use multiprocessing
+        """ find clusters in batches on tiles
+
+            Args:
+                batch_size<int>: Number of simultaneous jobs to run
         """
         self.lambda_client=boto3.client('lambda',config=Config(**BOTO3_CONFIG))
         self.responses=[]
@@ -458,9 +456,9 @@ class ClusterService(object):
                 return self._process_response(x,y,response)
             except Exception as e:
                 error_data=self._request_data(x,y,as_dict=True)
-                error_data['data']={}
+                error_data['data']={ 'x':x, 'y': y }
                 error_data['error']="{}".format(e)
-                error_data['error_trace']="service"
+                error_data['error_trace']="service.1"
                 return error_data
 
 
@@ -518,8 +516,8 @@ class ClusterService(object):
 
 
     def _error_row(self,error,response):
-        error_trace=response.get('error_trace','lambda')
-        z=response.get('z')
+        error_trace=response.get('error_trace','service.2')
+        z=response.get('z') or self.z
         x=response.get('x')
         y=response.get('y')
         if (z and x and y):

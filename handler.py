@@ -7,6 +7,11 @@ from clusters.request_parser import RequestParser
 import clusters.processors as proc
 from clusters.aws import AWS
 
+#
+# CONFIG
+#
+RETURN_EMPTY=False
+
 
 #
 # LOGGING CONFIG
@@ -22,25 +27,32 @@ logger.setLevel(logging.INFO)
 #
 def meanshift(event, context):
     req=RequestParser(event)
-    aws=AWS(req.table_name,req.bucket)
-    im_data=_im_data(req,aws)
-    if im_data is False:
-        return {
-            'error':'{} not found'.format(req.data_path),
-            'error_trace':'handler'}
+    if req.is_not_valid():
+        return _error(req,'request not valid')
     else:
-        im_data=_preprocess(req,im_data)
-        mshift=MShift(
-            data=im_data,
-            width=req.width,
-            min_count=req.min_count,
-            iterations=req.iterations)
-        output_data, nb_clusters=_output_data(req,mshift)
-        if nb_clusters>0: 
-            aws.db.put(output_data)
-            return output_data
-        else:
-            return None
+        try:
+            aws=AWS(req.table_name,req.bucket)
+            im_data=_im_data(req,aws)
+            if im_data is False:
+                return _error(req,'{} not found'.format(req.data_path))
+            else:
+                im_data=_preprocess(req,im_data)
+                mshift=MShift(
+                    data=im_data,
+                    width=req.width,
+                    min_count=req.min_count,
+                    iterations=req.iterations)
+                output_data, nb_clusters=_output_data(req,mshift)
+                if nb_clusters>0:
+                    aws.db.put(output_data)
+                    return output_data
+                elif RETURN_EMPTY:
+                    return output_data
+                else:
+                    return None
+        except Exception as e:
+            return _error(req,'Exception: {}'.format(e))
+
 
 
 def _im_data(req,aws):
@@ -70,6 +82,12 @@ def _output_data(req,mshift):
     return data, nb_clusters
 
 
+def _error(req,msg):
+    error={ 'error': msg, 'error_trace':'handler' }
+    error.update(req.data())
+    return error
+
+
 def _process_response(event,output_data):
     body = {
         "event": "{}".format(event),
@@ -81,6 +99,7 @@ def _process_response(event,output_data):
         "body": json.dumps(body)
     }
     return response
+
 
 
 

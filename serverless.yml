@@ -39,7 +39,7 @@ provider:
           - "dynamodb:PutItem"
           - "dynamodb:UpdateItem"
         Resource:
-          - "arn:aws:dynamodb:us-west-2:*:table/GFW_GLAD_CLUSTER.DEV.1"
+          - "arn:aws:dynamodb:us-west-2:*:table/GFW_GLAD_CLUSTER.DEV.2"
 
 
 package:
