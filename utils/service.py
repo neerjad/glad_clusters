@@ -24,6 +24,8 @@ DELETE_RESPONSES=True
 DEFAULT_BUCKET='gfw-clusters-test'
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
 
+CONVERTERS={ "alerts" :lambda r: np.array(json.loads(r)) }
+
 DATAFRAME_COLUMNS=[
     'count',
     'area',
@@ -34,8 +36,7 @@ DATAFRAME_COLUMNS=[
     'z','x','y','i','j',
     'file_name',
     'timestamp',
-    'alerts',
-    'input_data']
+    'alerts']
 
 
 VIEW_COLUMNS=[
@@ -59,10 +60,6 @@ ERROR_COLUMNS=[
 
 BOTO3_CONFIG={ 'read_timeout': 600 }
 MAX_PROCESSES=100
-CONVERTERS={
-    "alerts" :lambda r: np.array(json.loads(r)),
-    "input_data":lambda r: np.array(json.loads(r))
-}
 
 class ClusterService(object):
 
@@ -202,7 +199,6 @@ class ClusterService(object):
                 errors<bool[True]>: if true save errors-csv
         """
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
-        self._dataframe['input_data']=self._dataframe['input_data'].apply(lambda a: a.tolist())
         if local:
             self.dataframe().to_csv(
                 "{}.to_csv".format(filename),
@@ -487,8 +483,7 @@ class ClusterService(object):
                     z,x,y,i,j,
                     response['file_name'],
                     response['timestamp'],
-                    np.array(cluster.get('alerts')).astype(int),
-                    np.array(response['data']['input_data']).astype(int)])
+                    np.array(cluster.get('alerts')).astype(int)])
         return rrows
 
 
