@@ -4,7 +4,6 @@ from skimage import io
 import matplotlib.pyplot as plt
 
 
-DEFAULT_URL_BASE=os.environ.get('url')
 URL_TMPL='{}/{}/{}/{}.png'
 SIZE=256
 VALUE=1
@@ -38,9 +37,9 @@ class ClusterViewer(object):
             io.imshow(im)
 
 
-    def __init__(self,service,url_base=DEFAULT_URL_BASE):
+    def __init__(self,service,url_base=None):
         self.service=service
-        self.url_base=url_base
+        self.url_base=url_base or os.environ.get('url')
 
 
     def tile(self,
@@ -62,10 +61,23 @@ class ClusterViewer(object):
             return arr
 
 
+    def input(self,row_id,info=True):
+        row=self.service.cluster(row_id,as_view=False)
+        count,area,z,x,y,i,j,dmin,dmax=self._cluster_info(row)
+        alerts=self._to_image(row.input_data)
+        if info:
+            print("COUNT: {}".format(count))
+            print("AREA: {}".format(area))
+            print("POINT: {},{}".format(i,j))
+            print("ZXY: {}/{}/{}".format(z,x,y))
+            print("DATES: {}-{}".format(dmin,dmax))
+        ClusterViewer.show(alerts,i,j)
+
+
     def cluster(self,row_id,info=True):
         row=self.service.cluster(row_id,as_view=False)
         count,area,z,x,y,i,j,dmin,dmax=self._cluster_info(row)
-        alerts=self._cluster_alerts(row)
+        alerts=self._to_image(row.alerts)
         if info:
             print("COUNT: {}".format(count))
             print("AREA: {}".format(area))
@@ -97,13 +109,9 @@ class ClusterViewer(object):
             row.min_date,row.max_date)
 
 
-    def _cluster_alerts(self,row):
-        return self._to_image(row.alerts)
-
-
     def _cluster_axis(self,ax,row):
         count,area,z,x,y,i,j,dmin,dmax=self._cluster_info(row)
-        alerts=self._cluster_alerts(row)
+        alerts=self._to_image(row.alerts)
         title='count:{}, area:{}, pt:{},{}'.format(count,area,i,j)
         subtitle='dates: {}-{}'.format(dmin,dmax)        
         ClusterViewer.show(alerts,i,j,ax)
