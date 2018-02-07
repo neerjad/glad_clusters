@@ -140,6 +140,37 @@ class ClusterService(object):
             bucket=DEFAULT_BUCKET,
             dataframe=None,
             errors_dataframe=None):
+        """ ClusterService:
+            
+            Creates service for running cluster algorithm and/or viewing 
+            the resulting cluster data.
+
+            Args:
+                Use one of the following to select tiles to run:
+
+                    bounds<list>: tiles-lonlat bounding box
+                    tile_bounds<list>: tiles-xy bounding box
+                    lat,lon<int,int>: latitude,longitude used to run a single tile
+                    x,y<int,int>: tile-xy used to run a single tile
+
+                Other run arguments:
+
+                    start_date<str>: 'yyyy-mm-dd'
+                    end_date<str>: 'yyyy-mm-dd'
+                    min_count<int>: minimum number of alerts in a cluster
+                    width<int>: gaussian width in cluster algorithm
+                    iterations<int>: number of times to iterate when finding clusters
+                    z<int>: tile-zoom
+                    bucket<str>: aws-bucket used for saving csv file
+
+                Preloaded dataframe args:
+
+                    NOTE: Consider using ClusterService.read() rather than loading the
+                    dataframes directly.
+
+                    dataframe<pandas.dataframe>,
+                    errors_dataframe<pandas.dataframe>
+        """
         self._init_properties()
         self.start_date=start_date
         self.end_date=end_date
@@ -181,8 +212,6 @@ class ClusterService(object):
                 self._errors=None
             except Exception as e:
                 print("ERROR: run failure -- {}".format(e))
-
-
 
 
     def save(self,
@@ -249,35 +278,45 @@ class ClusterService(object):
             [mins[0],mins[1]]]
 
 
-    def dataframe(self):
+    def dataframe(self,full=False):
         """ return dataframe of clusters data
+
+            Args:
+                full<bool[False]>:
+                    if true return full dataframe
+                    otherwise only return VIEW_COLUMNS
         """
         if  self._dataframe is None:
             self._process_responses()
-        return self._dataframe
-
-
-    def view(self):
-        """ return only VIEW_COLUMNS of .dataframe()
-            * excludes data arrays, i and j, ...
-        """
-        return self.dataframe()[VIEW_COLUMNS]
-
-
-    def tile(self,row_id,as_view=True):
-        """ return rows matching z,x,y
-        """
-        df=self.dataframe()
-        row=df.iloc[row_id]
-        df=df[((df.z==row.z)&(df.x==row.x)&(df.y==row.y))]
-        if as_view:
-            return df[VIEW_COLUMNS]
+        if full:
+            return self._dataframe
         else:
+            return self._dataframe[VIEW_COLUMNS]
+
+
+    def tile(self,row_id=None,z=None,x=None,y=None,full=False):
+        """ return rows matching z,x,y
+
+            Args:
+                row_id<int>: row_id to get z/x/y from
+                z,x,y<int,int,int>: if not row_id specify z/x/y
+                full<bool[False]>:
+                    if true return full dataframe
+                    otherwise only return VIEW_COLUMNS
+        """
+        df=self.dataframe(full=True)
+        if row_id:
+            row=df.iloc[row_id]
+            z,x,y=row.z,row.x,row.y
+        df=df[((df.z==z)&(df.x==x)&(df.y==y))]
+        if full:
             return df
+        else:
+            return df[VIEW_COLUMNS]
 
 
     def errors(self):
-        """ return data frame of clusters data
+        """ return error dataframe
         """
         if  self._dataframe is None:
             self._process_responses()
@@ -290,7 +329,7 @@ class ClusterService(object):
             z=None,x=None,y=None,i=None,j=None,
             timestamp=None,
             ascending=False,
-            as_view=True):
+            full=False):
         """ fetch cluster data
 
             Convince method for selecting row of dataframe
@@ -302,8 +341,8 @@ class ClusterService(object):
                 timestamp<str>: timestamp for cluster (consider using row_id)
                 ascending<bool>: 
                     if true sort by ascending time and grab first matching row
-                as_view:
-                    if true return only VIEW_COLUMNS. 
+                full:
+                    if false return only VIEW_COLUMNS. 
                     else include all columns (including input/alerts data)
         """
         if self._not_none([row_id]):
@@ -324,10 +363,10 @@ class ClusterService(object):
             rows=self.dataframe()[test]
             if ascending: rows.sort_values('timestamp',inplace=True)
             row=rows.iloc[0]
-        if as_view:
-            return row[VIEW_COLUMNS]
-        else:
+        if full:
             return row
+        else:
+            return row[VIEW_COLUMNS]
 
 
 
