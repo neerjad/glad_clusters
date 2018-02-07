@@ -4,6 +4,7 @@ from clusters.convex_hull import ConvexHull
 import clusters.processors as proc
 
 NOISY=False
+INPUT_DATA=False
 WIDTH=15
 MIN_COUNT=6
 ITERATIONS=25
@@ -103,7 +104,7 @@ class MShift(object):
         """ dictionary
         """
         cluster_dict={}
-        cluster_dict['input_data']=self.ij_data().astype(int).tolist()
+        if INPUT_DATA: cluster_dict['input_data']=self.ij_data().astype(int).tolist()
         cluster_dict['nb_clusters']=len(self.clusters())
         cluster_dict['clusters']=[
             self.cluster_data(c) for c in self.clusters()]
