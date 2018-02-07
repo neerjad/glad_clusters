@@ -29,7 +29,7 @@ class RequestParser(object):
         'width',
         'iterations',
         'min_count',
-        'table_name',
+        'csv_bucket',
         'bucket',
         'data_path',
         'preprocess_data']
@@ -124,7 +124,7 @@ class RequestParser(object):
             'iterations': env.int('iterations'),
             'min_count': env.int('min_count'),
             'url': env.get('url',default=None),
-            'table_name': env.get('table'),
+            'csv_bucket': env.get('csv_bucket',default=None),
             'bucket': env.get('bucket',default=None),
             'download_folder': env.get('download_folder',default=DEFAULT_DOWNLOAD_FOLDER),
             'preprocess_data': env.get('preprocess_data',default=DEFAULT_PREPROCESS_DATA)}

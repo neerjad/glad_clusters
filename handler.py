@@ -5,7 +5,6 @@ import imageio as io
 from clusters.meanshift import MShift
 from clusters.request_parser import RequestParser
 import clusters.processors as proc
-from clusters.aws import AWS
 
 #
 # CONFIG
@@ -31,8 +30,7 @@ def meanshift(event, context):
         return _error(req,'request not valid',1)
     else:
         try:
-            aws=AWS(req.table_name,req.bucket)
-            im_data=_im_data(req,aws)
+            im_data=_im_data(req)
             if im_data is False:
                 return _error(req,'{} not found'.format(req.data_path),2)
             else:
@@ -43,10 +41,7 @@ def meanshift(event, context):
                     min_count=req.min_count,
                     iterations=req.iterations)
                 output_data, nb_clusters=_output_data(req,mshift)
-                if nb_clusters>0:
-                    # aws.db.put(output_data)
-                    return output_data
-                elif RETURN_EMPTY:
+                if (nb_clusters>0) or RETURN_EMPTY:
                     return output_data
                 else:
                     return None
@@ -55,8 +50,8 @@ def meanshift(event, context):
 
 
 
-def _im_data(req,aws):
-    if not req.url: aws.s3.download(req.file_name,req.data_path)
+def _im_data(req):
+    if not req.url: _download(req.bucket,req.file_name,req.data_path)
     try:
         return io.imread(req.data_path)
     except Exception as e:
@@ -101,6 +96,9 @@ def _process_response(event,output_data):
     return response
 
 
+def _download(self,bucket,file,download_path):
+    client=boto3.resource('s3').meta.client
+    return client.download_file(bucket,file,download_path)
 
 
 #

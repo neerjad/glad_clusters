@@ -4,7 +4,6 @@ import math
 import itertools
 import json
 import boto3
-from boto3.dynamodb.conditions import Attr
 from boto3.session import Config
 import numpy as np
 import pandas as pd
@@ -20,10 +19,6 @@ DEFAULT_WIDTH=5
 DEFAULT_ITERATIONS=25
 DEFAULT_ZOOM=12
 DELETE_RESPONSES=False
-DEFAULT_TABLE=os.environ.get('table')
-DEFAULT_BATCH_SIZE=200
-LISTEN_WAIT=1.0
-READY=u'Ready'
 
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
 
@@ -60,100 +55,10 @@ ERROR_COLUMNS=[
     'error_trace']
 
 
-BOTO3_CONFIG={
-    'read_timeout': 600
-}
-
-WUP_SCALE=200
-RUP_SCALE=200
-WDOWN_SCALE=5
-RDOWN_SCALE=5
+BOTO3_CONFIG={ 'read_timeout': 600 }
 MAX_PROCESSES=100
-FETCH_LIMIT=10000
 
 class ClusterService(object):
-
-    @staticmethod
-    def scale(
-            write=None,
-            read=None,
-            wup=False,
-            rup=False,
-            up=False,
-            down=False,
-            table=None,
-            listen=True,
-            noisy=True,
-            aws_response=False):
-        """ update read/write capcity for table 
-
-            Args:
-                write<int>: Write Capacity **MUST BE USED WITH 'read'**
-                read<int>: Read Capacity **MUST BE USED WITH 'write'**
-                wup<bool>: Scale-Up Write
-                rup<bool>: Scale-Up Read
-                up<bool>: Scale-Up Write and Read
-                down<bool>: Scale-Down Write and Read
-                table<str>: TableName defaults to eviron['table']
-                listen<bool>: Wait for status to be "Active"
-                noisy<bool>: Print "..." while waiting
-        """
-        if not table: table=os.environ['table']
-        config={}
-        if write and read:
-            config['ReadCapacityUnits']=read
-            config['WriteCapacityUnits']=write
-        elif wup:
-            config['ReadCapacityUnits']=RDOWN_SCALE
-            config['WriteCapacityUnits']=WUP_SCALE
-        elif rup:
-            config['ReadCapacityUnits']=RUP_SCALE
-            config['WriteCapacityUnits']=WDOWN_SCALE
-        elif up:
-            config['ReadCapacityUnits']=RUP_SCALE
-            config['WriteCapacityUnits']=WUP_SCALE
-        elif down:
-            config['ReadCapacityUnits']=RDOWN_SCALE
-            config['WriteCapacityUnits']=WDOWN_SCALE
-        db_client=boto3.client('dynamodb')
-        try:
-            aws_resp=db_client.update_table(
-                    TableName=table,
-                    ProvisionedThroughput=config)
-            if aws_response:
-                return aws_resp
-            elif listen:
-                return ClusterService.listen(table,noisy)
-            else:
-                return ClusterService.status(table)
-        except Exception as e:
-            return "WARNING: {}".format(e)
-
-
-    @staticmethod
-    def listen(table=None,noisy=True):
-        """ Wait for status "Active"
-
-            Args:
-                table<str>: TableName defaults to eviron['table']
-                noisy<bool>: Print "..." while waiting
-        """
-        while ClusterService.status(table)!=u'ACTIVE':
-            if noisy: print('...')
-            sleep(LISTEN_WAIT)
-        return READY
-
-
-    @staticmethod
-    def status(table=None):
-        """ get table status 
-
-            Args:
-                table<str>: TableName defaults to eviron['table']
-        """
-        if not table: table=os.environ['table']
-        db=boto3.resource('dynamodb')
-        return db.Table(table).table_status
 
 
     #
@@ -171,8 +76,7 @@ class ClusterService(object):
             min_count=DEFAULT_MIN_COUNT,
             width=DEFAULT_WIDTH,
             iterations=DEFAULT_ITERATIONS,
-            z=DEFAULT_ZOOM,
-            table=DEFAULT_TABLE):
+            z=DEFAULT_ZOOM):
         self._init_properties()
         self.start_date=DEFAULT_START_DATE
         self.end_date=DEFAULT_END_DATE
@@ -183,69 +87,6 @@ class ClusterService(object):
         self._N=(2**self.z)
         self.table=table or os.environ['table']
         self._set_tile_bounds(bounds,tile_bounds,lon,lat,x,y)
-        
-
-
-    def fetch(self,key=None,query=None,**kwargs):
-        """ fetch clusters from dynamodb 
-        """
-        # client = boto3.client('dynamodb')
-        # paginator = client.get_paginator('scan')
-        db=boto3.resource('dynamodb')
-        table=db.Table(self.table)
-        if key:
-            self.responses=[table.get_item(Key=key)]
-        else:
-            if query or kwargs:
-                filter_expression=self._db_filter(query or kwargs)
-            else:
-                filter_expression=self._build_filter()
-            self.responses=[]
-            # for page in paginator.paginate(
-            #         TableName=self.table,
-            #         FilterExpression=filter_expression,
-            #         Limit=FETCH_LIMIT):
-            #     print('...')
-            #     self.responses+=page.get('Items')
-            rows=table.scan(
-                FilterExpression=filter_expression,
-                Limit=FETCH_LIMIT)
-            # self.responses=rows.get('Items')
-            # table.scan()
-            # items = response['Items']
-            while True:
-                print len(rows['Items'])
-                if rows.get('LastEvaluatedKey'):
-                    scanresp = table.scan(ExclusiveStartKey=rows['LastEvaluatedKey'])
-                    self.responses += scanresp['Items']
-                else:
-                    break
-
-
-
-    def batch_run(self,batch_size=DEFAULT_BATCH_SIZE,max_processes=MAX_PROCESSES):
-        """ find clusters in batches on tiles
-
-            Args:
-                batch_size<int>: Number of simultaneous jobs to run
-        """
-        self.lambda_client=boto3.client('lambda',config=Config(**BOTO3_CONFIG))
-        self.responses=[]
-        xys=list(itertools.product(
-            range(self.x_min,self.x_max+1),
-            range(self.y_min,self.y_max+1)))
-        self._nb_batches=math.ceil(len(xys)/batch_size)
-        self._batch_index=0
-        while self._batch_index<self._nb_batches:
-            start=self._batch_index*batch_size
-            end=start+batch_size
-            self.responses+=mp.map_with_threadpool(
-                self._run_tile,
-                list(xys[start:end]),
-                max_processes=max_processes)
-            self._batch_index+=1
-            print(self._batch_index,start,end)
-
 
 
     def run(self,max_processes=MAX_PROCESSES):
@@ -269,15 +110,8 @@ class ClusterService(object):
                 max_processes=max_processes)
 
 
-    def write(self,range_max=None):
-        """ write responses to dynamodb
-        """
-        db=DynamoDB(self.table)
-        db.batch_put(self.responses,range_max)
-
-
     def save(self,filename):
-        """ write responses to dynamodb
+        """ write responses to csv
         """
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         self._dataframe['input_data']=self._dataframe['input_data'].apply(lambda a: a.tolist())
@@ -411,39 +245,6 @@ class ClusterService(object):
         self.y=None
         self._dataframe=None
         self._error_dataframe=None
-
-
-    def _db_filter(self,query):
-        keys=query.keys()
-        key0=keys.pop()
-        db_filter=Attr(key0).eq(query[key0])
-        for key in keys:
-            db_filter&=Attr(key).eq(query[key])
-        return db_filter
-
-
-    def _build_filter(self):
-        db_filter=Attr('z').eq(self.z)
-        if self.start_date:
-            db_filter &= Attr('start_date').gte(self.start_date)
-        if self.end_date:
-            db_filter &= Attr('end_date').lte(self.end_date)
-        if self.min_count:
-            db_filter &= Attr('min_count').eq(self.min_count)
-        if self.width:
-            db_filter &= Attr('width').eq(self.width)
-        if self.iterations:
-            db_filter &= Attr('iterations').eq(self.iterations)
-        if self.x and self.y:
-            db_filter &= Attr('x').eq(self.x)
-            db_filter &= Attr('y').eq(self.y)
-        if self.x_min and self.x_max:
-            db_filter &= Attr('x').gte(self.x_min)
-            db_filter &= Attr('x').lte(self.x_max)
-        if self.y_min and self.y_max:
-            db_filter &= Attr('y').gte(self.y_min)
-            db_filter &= Attr('y').lte(self.y_max)
-        return db_filter
 
 
     def _request_data(self,x,y,as_dict=False):
