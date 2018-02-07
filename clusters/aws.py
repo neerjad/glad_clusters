@@ -6,9 +6,12 @@ class AWS(object):
     #
     # PUBLIC METHODS
     #
-    def __init__(self,table_name,bucket):
-        self.s3=S3(bucket)
-        self.db=DynamoDB(table_name)
+    def __init__(self,table_name=None,bucket=None):
+        self.s3=None
+        self.db=None
+        if table_name: self.db=DynamoDB(table_name)
+        if bucket: self.s3=S3(bucket)
+        
 
 
 
@@ -42,3 +45,20 @@ class DynamoDB(object):
         self.db_data=data
         table=boto3.resource(self.CLIENT_NAME).Table(self.table_name)
         return table.put_item(Item=data)
+
+
+    def batch_put(self,items,range_max=None):
+        table=boto3.resource(self.CLIENT_NAME).Table(self.table_name)
+        if range_max:
+            range_max=min(range_max,len(items))
+        else:   
+            range_max=len(items)
+        with table.batch_writer() as batch:
+            for i in range(range_max):
+                item=items[i]
+                if item.get('file_name') and item.get('timestamp'): 
+                    batch.put_item(
+                        Item=items[i]
+                    )
+
+

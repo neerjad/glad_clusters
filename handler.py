@@ -44,7 +44,7 @@ def meanshift(event, context):
                     iterations=req.iterations)
                 output_data, nb_clusters=_output_data(req,mshift)
                 if nb_clusters>0:
-                    aws.db.put(output_data)
+                    # aws.db.put(output_data)
                     return output_data
                 elif RETURN_EMPTY:
                     return output_data

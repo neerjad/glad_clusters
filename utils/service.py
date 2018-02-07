@@ -9,6 +9,7 @@ from boto3.session import Config
 import numpy as np
 import pandas as pd
 import utils.multiprocess as mp
+from clusters.aws import DynamoDB
 from pprint import pprint
 
 
@@ -22,6 +23,7 @@ DELETE_RESPONSES=False
 DEFAULT_TABLE=os.environ.get('table')
 DEFAULT_BATCH_SIZE=200
 LISTEN_WAIT=1.0
+READY=u'Ready'
 
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
 
@@ -30,8 +32,8 @@ DATAFRAME_COLUMNS=[
     'area',
     'min_date',
     'max_date',
-    'latitude',
     'longitude',
+    'latitude',
     'z','x','y','i','j',
     'file_name',
     'timestamp',
@@ -44,16 +46,16 @@ VIEW_COLUMNS=[
     'area',
     'min_date',
     'max_date',
-    'latitude',
     'longitude',
+    'latitude',
     'x','y',
     'timestamp']
 
 
 ERROR_COLUMNS=[
     'z','x','y',
-    'centroid_latitude',
     'centroid_longitude',
+    'centroid_latitude',
     'error',
     'error_trace']
 
@@ -138,7 +140,7 @@ class ClusterService(object):
         while ClusterService.status(table)!=u'ACTIVE':
             if noisy: print('...')
             sleep(LISTEN_WAIT)
-        return True
+        return READY
 
 
     @staticmethod
@@ -179,7 +181,7 @@ class ClusterService(object):
         self.z=z
         self._N=(2**self.z)
         self.table=table or os.environ['table']
-        self._set_tile_bounds(bounds,tile_bounds,lat,lon,x,y)
+        self._set_tile_bounds(bounds,tile_bounds,lon,lat,x,y)
         
 
 
@@ -244,7 +246,14 @@ class ClusterService(object):
                 list(xys),
                 max_processes=max_processes)
 
-    
+
+    def write(self,range_max=None):
+        """ write responses to dynamodb
+        """
+        db=DynamoDB(self.table)
+        db.batch_put(self.responses,range_max)
+
+
     def request_size(self):
         """ get number of requests
         """
@@ -255,10 +264,10 @@ class ClusterService(object):
         """ get lat/lon-bounds
         """
         lat_min=self._lat(self.z,self.x_min,self.y_min,0,0)
-        lat_max=self._lat(self.z,self.x_max,self.y_max,0,0)
+        lat_max=self._lat(self.z,self.x_max,self.y_max,254.0,254.0)
         lon_min=self._lon(self.z,self.x_min,self.y_min,0,0)
-        lon_max=self._lon(self.z,self.x_max,self.y_max,0,0)
-        return [[lat_min,lon_min],[lat_max,lon_max]]
+        lon_max=self._lon(self.z,self.x_max,self.y_max,254.0,254.0)
+        return [[lon_min,lat_min],[lon_max,lat_max]]
 
 
     def bounding_box(self):
@@ -328,7 +337,7 @@ class ClusterService(object):
             row=self.dataframe().iloc[row_id]
         else:
             test=True
-            if self._not_none([lat,lon]):
+            if self._not_none([lon,lat]):
                 test=test & (
                     (self.dataframe().latitude==lat) & 
                     (self.dataframe().longitude==lon))
@@ -408,15 +417,15 @@ class ClusterService(object):
             return json.dumps(data)
 
     
-    def _set_tile_bounds(self,bounds,tile_bounds,lat,lon,x,y):
+    def _set_tile_bounds(self,bounds,tile_bounds,lon,lat,x,y):
         """
-            NOTE: if a single pair (x,y) or (lat,lon) the x,y-values 
+            NOTE: if a single pair (x,y) or (lon,lat) the x,y-values 
             will be set for the find_by_tile method.
         """
         if bounds:
-            tile_bounds=[self._latlon_to_xy(*latlon) for latlon in bounds]
+            tile_bounds=[self._lonlat_to_xy(*lonlat) for lonlat in bounds]
         elif (lat and lon):
-            self.x,self.y=self._latlon_to_xy(lat,lon)
+            self.x,self.y=self._lonlat_to_xy(lon,lat)
             tile_bounds=[[self.x,self.y],[self.x,self.y]]
         elif (x and y):
             self.x=int(x)
@@ -427,11 +436,13 @@ class ClusterService(object):
         self.x_max,self.y_max=tile_bounds.max(axis=0)
             
             
-    def _latlon_to_xy(self,lat,lon):
+    def _lonlat_to_xy(self,lon,lat):
         lat_rad=math.radians(lat)
         x=self._N*(lon+180.0)/360
         y=self._N*(1.0-math.log(math.tan(lat_rad)+(1/math.cos(lat_rad)))/math.pi)/2.0
+        # y=(self._N-1)-1
         return int(x),int(y)
+
     
     
     def _lat(self,z,x,y,i,j):
@@ -459,7 +470,7 @@ class ClusterService(object):
         """ find clusters on tile
         
             NOTE: if no args are passed it will attempt to use 
-                  the x,y (or lat,lon) passed in the constructor
+                  the x,y (or lon,lat) passed in the constructor
         
             Args:
                 location<tuple>: tile-xy value (x,y)
@@ -548,8 +559,8 @@ class ClusterService(object):
             lat=self._lat(int(z),int(x),int(y),128,128)
             lon=self._lon(int(z),int(x),int(y),128,128)
         else:
-            lat,lon=None,None
-        return [z,x,y,lat,lon,error,error_trace]
+            lon,lat=None,None
+        return [z,x,y,lon,lat,error,error_trace]
 
 
     def _not_none(self,values):
