@@ -11,15 +11,17 @@ import utils.multiprocess as mp
 from clusters.aws import DynamoDB
 from pprint import pprint
 
-
+CSV_ACL='public-read'
+S3_URL_TMPL='https://s3-{}.amazonaws.com'
+DEFAULT_REGION='us-west-2'
 DEFAULT_START_DATE='2015-01-01'
 DEFAULT_END_DATE='2025-01-01'
 DEFAULT_MIN_COUNT=25
 DEFAULT_WIDTH=5
 DEFAULT_ITERATIONS=25
 DEFAULT_ZOOM=12
-DELETE_RESPONSES=False
-
+DELETE_RESPONSES=True
+DEFAULT_BUCKET='gfw-clusters-test'
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
 
 DATAFRAME_COLUMNS=[
@@ -57,8 +59,69 @@ ERROR_COLUMNS=[
 
 BOTO3_CONFIG={ 'read_timeout': 600 }
 MAX_PROCESSES=100
+CONVERTERS={
+    "alerts" :lambda r: np.array(json.loads(r)),
+    "input_data":lambda r: np.array(json.loads(r))
+}
 
 class ClusterService(object):
+
+
+    @staticmethod
+    def read(filename,
+            local=False,
+            region=DEFAULT_REGION,
+            bucket=DEFAULT_BUCKET,
+            url_base=None,
+            errors=True):
+        """ init from csv
+
+            Args:
+                filename<str>: name/path of csv without '.csv' extension 
+                local<bool[False]>: if true read from local file else read from s3 file
+                region<str>: aws-region required if not local and not url_base
+                bucket<str>: aws-bucket required if not local
+                url_base<str>: aws-url-root for bucket
+                errors<bool[True]>: if true include errors-csv
+        """
+        if local:
+            dfpath='{}.csv'.format(filename)
+            if errors: edfpath='{}.errors.csv'.format(filename)
+        else:
+            if not url_base: url_base=S3_URL_TMPL.format(region)
+            url_base="{}/{}".format(url_base,bucket)
+            dfpath='{}/{}.csv'.format(url_base,filename)
+            if errors: edfpath='{}/{}.errors.csv'.format(url_base,filename)
+        df=pd.read_csv(dfpath,converters=CONVERTERS)
+        if errors: 
+            try:
+                edf=pd.read_csv(edfpath)
+            except:
+                edf=None
+        else: edf=None
+        params=ClusterService.run_params(df)
+        return ClusterService(
+                dataframe=df,
+                errors_dataframe=edf,
+                **params)
+
+
+    @staticmethod
+    def run_params(dataframe):
+        """ return run params based on dataframe
+        """
+        z=int(dataframe.iloc[0].z)
+        x_min,y_min=dataframe[['x','y']].min().tolist()
+        x_max,y_max=dataframe[['x','y']].max().tolist()
+        sdate=str(dataframe.min_date.min())
+        edate=str(dataframe.max_date.max())
+        sdate="{}-{}-{}".format(sdate[:4],sdate[4:6],sdate[6:])
+        edate="{}-{}-{}".format(edate[:4],edate[4:6],edate[6:])
+        return {
+            'z': z,
+            'tile_bounds': [[x_min,y_min],[x_max,y_max]],
+            'start_date': sdate,
+            'end_date': edate }
 
 
     #
@@ -76,53 +139,94 @@ class ClusterService(object):
             min_count=DEFAULT_MIN_COUNT,
             width=DEFAULT_WIDTH,
             iterations=DEFAULT_ITERATIONS,
-            z=DEFAULT_ZOOM):
+            z=DEFAULT_ZOOM,
+            bucket=DEFAULT_BUCKET,
+            dataframe=None,
+            errors_dataframe=None):
         self._init_properties()
-        self.start_date=DEFAULT_START_DATE
-        self.end_date=DEFAULT_END_DATE
+        self.start_date=start_date
+        self.end_date=end_date
         self.min_count=min_count
         self.width=width
         self.iterations=iterations
         self.z=z
+        self.bucket=bucket
+        self._dataframe=dataframe
+        self._error_dataframe=errors_dataframe
         self._N=(2**self.z)
-        self.table=table or os.environ['table']
         self._set_tile_bounds(bounds,tile_bounds,lon,lat,x,y)
 
 
-    def run(self,max_processes=MAX_PROCESSES):
+    def run(self,max_processes=MAX_PROCESSES,force=False):
         """ find clusters on tiles
-        
-            NOTE: if (self.x and self.y): 
-                    pass directly to _run_tile
-                  else:
-                    use multiprocessing
+
+            Args:
+                max_processes<int>: number of processes used in launching jobs
+                force<bool[False]>: if true run even if dataframe is loaded
         """
-        self.lambda_client=boto3.client('lambda',config=Config(**BOTO3_CONFIG))
-        if (self.x and self.y):
-            self.responses=[self._run_tile()]
+        if (self._dataframe is not None) and (not force):
+            print("WARNING: data already loaded pass 'force=True' to overwrite")
         else:
-            xys=itertools.product(
-                range(self.x_min,self.x_max+1),
-                range(self.y_min,self.y_max+1))
-            self.responses=mp.map_with_threadpool(
-                self._run_tile,
-                list(xys),
-                max_processes=max_processes)
+            try:
+                # self.responses=None
+                self.lambda_client=boto3.client('lambda',config=Config(**BOTO3_CONFIG))
+                if (self.x and self.y):
+                    self.responses=[self._run_tile()]
+                else:
+                    xys=itertools.product(
+                        range(self.x_min,self.x_max+1),
+                        range(self.y_min,self.y_max+1))
+                    self.responses=mp.map_with_threadpool(
+                        self._run_tile,
+                        list(xys),
+                        max_processes=max_processes)
+                self._dataframe=None
+                self._errors=None
+            except Exception as e:
+                print("ERROR: run failure -- {}".format(e))
 
 
-    def save(self,filename):
+
+
+    def save(self,
+            filename,
+            local=False,
+            bucket=None,
+            errors=True):
         """ write responses to csv
+
+            Args:
+                filename<str>: name/path of csv without '.csv' extension 
+                local<bool[False]>: if true write to local file else write to s3 file
+                bucket<str>: aws-bucket required if not local and not self.bucket
+                errors<bool[True]>: if true save errors-csv
         """
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         self._dataframe['input_data']=self._dataframe['input_data'].apply(lambda a: a.tolist())
-        s3=boto3.resource('s3')
-        b='gfw-clusters-test'
-        s3.Object(b,filename).put(Body=self.dataframe().to_csv(None,index=None))
-        s3.Object(b,filename).Acl().put(ACL='public-read')
+        if local:
+            self.dataframe().to_csv(
+                "{}.to_csv".format(filename),
+                index=None)
+            if errors and self.errors().shape[0]:
+                self.errors().to_csv(
+                    "{}.errors.to_csv".format(filename),
+                    index=None)
+        else:
+            obj=boto3.resource('s3').Object(
+                bucket or self.bucket,
+                "{}.csv".format(filename))
+            obj.put(Body=self.dataframe().to_csv(None,index=None))
+            obj.Acl().put(ACL=CSV_ACL)
+            if errors and self.errors().shape[0]:
+                obj=boto3.resource('s3').Object(
+                    bucket or self.bucket,
+                    "{}.errors.csv".format(filename))
+                obj.put(Body=self.errors().to_csv(None,index=None))
+                obj.Acl().put(ACL=CSV_ACL)
 
 
     def request_size(self):
-        """ get number of requests
+        """ get number of tiles in request
         """
         return (self.x_max-self.x_min+1)*(self.y_max-self.y_min+1)
 
@@ -150,13 +254,10 @@ class ClusterService(object):
 
 
     def dataframe(self):
-        """ return data frame of clusters data
-            
-            NOTE: if DELETE_RESPONSES is True
-                  responses json will be removed
+        """ return dataframe of clusters data
         """
         if  self._dataframe is None:
-            self._process_dataframes()
+            self._process_responses()
         return self._dataframe
 
 
@@ -181,12 +282,9 @@ class ClusterService(object):
 
     def errors(self):
         """ return data frame of clusters data
-            
-            NOTE: if DELETE_RESPONSES is True
-                  responses json will be removed
         """
-        if  self._error_dataframe is None:
-            self._process_dataframes()
+        if  self._dataframe is None:
+            self._process_responses()
         return self._error_dataframe
 
 
@@ -243,8 +341,6 @@ class ClusterService(object):
     def _init_properties(self):
         self.x=None
         self.y=None
-        self._dataframe=None
-        self._error_dataframe=None
 
 
     def _request_data(self,x,y,as_dict=False):
@@ -343,7 +439,7 @@ class ClusterService(object):
                 return error_data
 
 
-    def _process_dataframes(self):
+    def _process_responses(self):
         rows,error_rows=self._dataframes_rows()
         self._dataframe=pd.DataFrame(
             rows, 
