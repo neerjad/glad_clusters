@@ -21,13 +21,16 @@ class ClusterViewer(object):
     @staticmethod
     def show(im,i=None,j=None,ax=None):
         if (i and j):
+            if isinstance(i,int): 
+                i=[i]
+                j=[j]
             if ax:
                 show=False
             else:
                 show=True
                 fig, ax = plt.subplots(1,1, figsize=FIGSIZE)
             ax.imshow(im)
-            ax.scatter([j],[i],
+            ax.scatter(j,i,
                 marker=CLUSTER_MARKER,
                 c=CLUSTER_COLOR,
                 s=CLUSTER_SIZE)
@@ -62,16 +65,18 @@ class ClusterViewer(object):
 
 
     def input(self,row_id,info=True):
-        row=self.service.cluster(row_id,as_view=False)
-        count,area,z,x,y,i,j,dmin,dmax=self._cluster_info(row)
-        alerts=self._to_image(row.input_data)
+        rows=self.service.tile(row_id,as_view=False)
+        count=rows['count'].sum()
+        area=rows.area.sum()
+        dmin=rows.min_date.min()
+        dmax=rows.max_date.max()
+        alerts=self._to_image(rows.iloc[0].input_data)
         if info:
-            print("COUNT: {}".format(count))
-            print("AREA: {}".format(area))
-            print("POINT: {},{}".format(i,j))
-            print("ZXY: {}/{}/{}".format(z,x,y))
+            print("NB CLUSTERS: {}".format(rows.shape[0]))
+            print("TOTAL COUNT: {}".format(count))
+            print("TOTAL AREA: {}".format(area))
             print("DATES: {}-{}".format(dmin,dmax))
-        ClusterViewer.show(alerts,i,j)
+        ClusterViewer.show(alerts,rows.i.tolist(),rows.j.tolist())
 
 
     def cluster(self,row_id,info=True):
@@ -114,7 +119,7 @@ class ClusterViewer(object):
         alerts=self._to_image(row.alerts)
         title='count:{}, area:{}, pt:{},{}'.format(count,area,i,j)
         subtitle='dates: {}-{}'.format(dmin,dmax)        
-        ClusterViewer.show(alerts,i,j,ax)
+        ClusterViewer.show(alerts,i,j,ax=ax)
         ax.scatter([j],[i],marker='o',c='r',s=20)
         ax.set_title(title)
         ax.set_xlabel(subtitle)
