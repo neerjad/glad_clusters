@@ -69,6 +69,7 @@ RUP_SCALE=200
 WDOWN_SCALE=5
 RDOWN_SCALE=5
 MAX_PROCESSES=100
+FETCH_LIMIT=10000
 
 class ClusterService(object):
 
@@ -188,6 +189,8 @@ class ClusterService(object):
     def fetch(self,key=None,query=None,**kwargs):
         """ fetch clusters from dynamodb 
         """
+        # client = boto3.client('dynamodb')
+        # paginator = client.get_paginator('scan')
         db=boto3.resource('dynamodb')
         table=db.Table(self.table)
         if key:
@@ -197,8 +200,27 @@ class ClusterService(object):
                 filter_expression=self._db_filter(query or kwargs)
             else:
                 filter_expression=self._build_filter()
-            rows=table.scan(FilterExpression=filter_expression)
-            self.responses=rows.get('Items')
+            self.responses=[]
+            # for page in paginator.paginate(
+            #         TableName=self.table,
+            #         FilterExpression=filter_expression,
+            #         Limit=FETCH_LIMIT):
+            #     print('...')
+            #     self.responses+=page.get('Items')
+            rows=table.scan(
+                FilterExpression=filter_expression,
+                Limit=FETCH_LIMIT)
+            # self.responses=rows.get('Items')
+            # table.scan()
+            # items = response['Items']
+            while True:
+                print len(rows['Items'])
+                if rows.get('LastEvaluatedKey'):
+                    scanresp = table.scan(ExclusiveStartKey=rows['LastEvaluatedKey'])
+                    self.responses += scanresp['Items']
+                else:
+                    break
+
 
 
     def batch_run(self,batch_size=DEFAULT_BATCH_SIZE,max_processes=MAX_PROCESSES):
@@ -254,6 +276,17 @@ class ClusterService(object):
         db.batch_put(self.responses,range_max)
 
 
+    def save(self,filename):
+        """ write responses to dynamodb
+        """
+        self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
+        self._dataframe['input_data']=self._dataframe['input_data'].apply(lambda a: a.tolist())
+        s3=boto3.resource('s3')
+        b='gfw-clusters-test'
+        s3.Object(b,filename).put(Body=self.dataframe().to_csv(None,index=None))
+        s3.Object(b,filename).Acl().put(ACL='public-read')
+
+
     def request_size(self):
         """ get number of requests
         """
@@ -298,6 +331,18 @@ class ClusterService(object):
             * excludes data arrays, i and j, ...
         """
         return self.dataframe()[VIEW_COLUMNS]
+
+
+    def tile(self,row_id,as_view=True):
+        """ return rows matching z,x,y
+        """
+        df=self.dataframe()
+        row=df.iloc[row_id]
+        df=df[((df.z==row.z)&(df.x==row.x)&(df.y==row.y))]
+        if as_view:
+            return df[VIEW_COLUMNS]
+        else:
+            return df
 
 
     def errors(self):
