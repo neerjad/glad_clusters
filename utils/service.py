@@ -23,8 +23,10 @@ DEFAULT_ZOOM=12
 DELETE_RESPONSES=True
 DEFAULT_BUCKET='gfw-clusters-test'
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
-
+DEFAULT_CSV_IDENT='clusters'
+CSV_NAME_TMPL="{}_{}:{}_{}:{}:{}:{}_{}:{}:{}:{}"
 CONVERTERS={ "alerts" :lambda r: np.array(json.loads(r)) }
+
 
 DATAFRAME_COLUMNS=[
     'count',
@@ -140,16 +142,24 @@ class ClusterService(object):
         z=int(dataframe.iloc[0].z)
         x_min,y_min=dataframe[['x','y']].min().tolist()
         x_max,y_max=dataframe[['x','y']].max().tolist()
-        sdate=str(dataframe.min_date.min())
-        edate=str(dataframe.max_date.max())
-        sdate="{}-{}-{}".format(sdate[:4],sdate[4:6],sdate[6:])
-        edate="{}-{}-{}".format(edate[:4],edate[4:6],edate[6:])
+        sdate,edate=ClusterService.int_to_str_dates(
+                dataframe.min_date.min(),
+                dataframe.max_date.max())
         return {
             'z': z,
             'tile_bounds': [[x_min,y_min],[x_max,y_max]],
             'start_date': sdate,
             'end_date': edate }
 
+
+    @staticmethod
+    def int_to_str_dates(sdate,edate):
+        """ convert date ints to date strs
+        """
+        sdate, edate=str(sdate), str(edate)
+        sdate="{}-{}-{}".format(sdate[:4],sdate[4:6],sdate[6:])
+        edate="{}-{}-{}".format(edate[:4],edate[4:6],edate[6:])
+        return sdate, edate
 
     #
     #  PUBLC METHODS
@@ -213,19 +223,38 @@ class ClusterService(object):
                 print("ERROR: run failure -- {}".format(e))
 
 
+    def name(self,ident=DEFAULT_CSV_IDENT):
+        """ construct service name. use as default filename
+        """
+        return CSV_NAME_TMPL.format(
+                ident,
+                self.start_date,self.end_date,
+                self.x_min,self.y_min,self.x_max,self.y_max,
+                self.z,self.width,self.min_count,self.iterations)
+
+
     def save(self,
-            filename,
+            ident=DEFAULT_CSV_IDENT,
+            filename=None,
             local=False,
             bucket=None,
             errors=True):
         """ write responses to csv
 
             Args:
-                filename<str>: name/path of csv without '.csv' extension 
-                local<bool[False]>: if true write to local file else write to s3 file
-                bucket<str>: aws-bucket required if not local and not self.bucket
-                errors<bool[True]>: if true save errors-csv
+
+                Use one of the following:
+            
+                    filename<str>: name/path of csv without '.csv' extension 
+                    ident<str[DEFAULT_CSV_IDENT]>: prefix to default_name 
+                
+                Other arguments:
+                
+                    local<bool[False]>: if true write to local file else write to s3 file
+                    bucket<str>: aws-bucket required if not local and not self.bucket
+                    errors<bool[True]>: if true save errors-csv
         """
+        if not filename: filename=self.name(ident)
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         if local:
             self.dataframe(full=True).to_csv(
