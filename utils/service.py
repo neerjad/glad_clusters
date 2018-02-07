@@ -228,7 +228,7 @@ class ClusterService(object):
         """
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         if local:
-            self.dataframe().to_csv(
+            self.dataframe(full=True).to_csv(
                 "{}.to_csv".format(filename),
                 index=None)
             if errors and self.errors().shape[0]:
@@ -239,7 +239,7 @@ class ClusterService(object):
             obj=boto3.resource('s3').Object(
                 bucket or self.bucket,
                 "{}.csv".format(filename))
-            obj.put(Body=self.dataframe().to_csv(None,index=None))
+            obj.put(Body=self.dataframe(full=True).to_csv(None,index=None))
             obj.Acl().put(ACL=CSV_ACL)
             if errors and self.errors().shape[0]:
                 obj=boto3.resource('s3').Object(
@@ -345,7 +345,7 @@ class ClusterService(object):
                         timestamp<str>: timestamp for cluster
 
                 Other arguments:
-                
+
                     ascending<bool>: 
                         if true sort by ascending time and grab first matching row
                     full:
@@ -353,21 +353,21 @@ class ClusterService(object):
                         else include all columns (including input/alerts data)
         """
         if self._not_none([row_id]):
-            row=self.dataframe().iloc[row_id]
+            row=self.dataframe(full=True).iloc[row_id]
         else:
             test=True
             if self._not_none([lon,lat]):
                 test=test & (
-                    (self.dataframe().latitude==lat) & 
-                    (self.dataframe().longitude==lon))
+                    (self.dataframe(full=True).latitude==lat) & 
+                    (self.dataframe(full=True).longitude==lon))
             elif self._not_none([x,y,z]):
                 test=test & (
-                    (self.dataframe().z==z) & 
-                    (self.dataframe().x==x) & 
-                    (self.dataframe().y==y))
+                    (self.dataframe(full=True).z==z) & 
+                    (self.dataframe(full=True).x==x) & 
+                    (self.dataframe(full=True).y==y))
             if timestamp:
-                test=test & (self.dataframe().timestamp==timestamp)
-            rows=self.dataframe()[test]
+                test=test & (self.dataframe(full=True).timestamp==timestamp)
+            rows=self.dataframe(full=True)[test]
             if ascending: rows.sort_values('timestamp',inplace=True)
             row=rows.iloc[0]
         if full:
