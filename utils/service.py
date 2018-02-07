@@ -59,9 +59,8 @@ ERROR_COLUMNS=[
     'error',
     'error_trace']
 
-
 BOTO3_CONFIG={ 'read_timeout': 600 }
-MAX_PROCESSES=100
+MAX_PROCESSES=200
 
 class ClusterService(object):
     """ ClusterService:
@@ -95,7 +94,6 @@ class ClusterService(object):
                 dataframe<pandas.dataframe>,
                 errors_dataframe<pandas.dataframe>
     """
-
     @staticmethod
     def read(filename,
             local=False,
