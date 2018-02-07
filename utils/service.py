@@ -62,7 +62,37 @@ BOTO3_CONFIG={ 'read_timeout': 600 }
 MAX_PROCESSES=100
 
 class ClusterService(object):
+    """ ClusterService:
+        
+        Creates service for running cluster algorithm and/or viewing 
+        the resulting cluster data.
 
+        Args:
+            Use one of the following to select tiles to run:
+
+                bounds<list>: tiles-lonlat bounding box
+                tile_bounds<list>: tiles-xy bounding box
+                lat,lon<int,int>: latitude,longitude used to run a single tile
+                x,y<int,int>: tile-xy used to run a single tile
+
+            Other run arguments:
+
+                start_date<str>: 'yyyy-mm-dd'
+                end_date<str>: 'yyyy-mm-dd'
+                min_count<int>: minimum number of alerts in a cluster
+                width<int>: gaussian width in cluster algorithm
+                iterations<int>: number of times to iterate when finding clusters
+                z<int>: tile-zoom
+                bucket<str>: aws-bucket used for saving csv file
+
+            Preloaded dataframe args:
+
+                NOTE: Consider using ClusterService.read() rather than loading the
+                dataframes directly.
+
+                dataframe<pandas.dataframe>,
+                errors_dataframe<pandas.dataframe>
+    """
 
     @staticmethod
     def read(filename,
@@ -140,37 +170,6 @@ class ClusterService(object):
             bucket=DEFAULT_BUCKET,
             dataframe=None,
             errors_dataframe=None):
-        """ ClusterService:
-            
-            Creates service for running cluster algorithm and/or viewing 
-            the resulting cluster data.
-
-            Args:
-                Use one of the following to select tiles to run:
-
-                    bounds<list>: tiles-lonlat bounding box
-                    tile_bounds<list>: tiles-xy bounding box
-                    lat,lon<int,int>: latitude,longitude used to run a single tile
-                    x,y<int,int>: tile-xy used to run a single tile
-
-                Other run arguments:
-
-                    start_date<str>: 'yyyy-mm-dd'
-                    end_date<str>: 'yyyy-mm-dd'
-                    min_count<int>: minimum number of alerts in a cluster
-                    width<int>: gaussian width in cluster algorithm
-                    iterations<int>: number of times to iterate when finding clusters
-                    z<int>: tile-zoom
-                    bucket<str>: aws-bucket used for saving csv file
-
-                Preloaded dataframe args:
-
-                    NOTE: Consider using ClusterService.read() rather than loading the
-                    dataframes directly.
-
-                    dataframe<pandas.dataframe>,
-                    errors_dataframe<pandas.dataframe>
-        """
         self._init_properties()
         self.start_date=start_date
         self.end_date=end_date
@@ -330,20 +329,28 @@ class ClusterService(object):
             timestamp=None,
             ascending=False,
             full=False):
-        """ fetch cluster data
+        """ fetch data for single cluster
 
-            Convince method for selecting row of dataframe
+            Method for selecting row of dataframe
             
             Args:
-                row_id<int>: dataframe index for cluster
-                lat,lon<floats>: latitude,longitude for cluster
-                z,x,y,i,j<ints>: tile/pixel location for cluster
-                timestamp<str>: timestamp for cluster (consider using row_id)
-                ascending<bool>: 
-                    if true sort by ascending time and grab first matching row
-                full:
-                    if false return only VIEW_COLUMNS. 
-                    else include all columns (including input/alerts data)
+
+                Use one of the following to select the row:
+
+                    row_id<int>: dataframe index for cluster
+                    lat,lon<floats>: latitude,longitude for cluster
+                    z,x,y,i,j<ints>: tile/pixel location for cluster
+
+                    (optional - really consider using row_id):
+                        timestamp<str>: timestamp for cluster
+
+                Other arguments:
+                
+                    ascending<bool>: 
+                        if true sort by ascending time and grab first matching row
+                    full:
+                        if false return only VIEW_COLUMNS. 
+                        else include all columns (including input/alerts data)
         """
         if self._not_none([row_id]):
             row=self.dataframe().iloc[row_id]
