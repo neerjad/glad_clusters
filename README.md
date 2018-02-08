@@ -40,7 +40,7 @@ view.tile(182)
 view.cluster(182)
 
 # view clusters 182,4,185,6 in a single row 
-view.clusters(row_ids=[82,3,184,6])
+view.clusters(row_ids=[182,4,185,6])
 
 # view clusters 182 through 184 in a single row
 view.clusters(start=182,end=185)
