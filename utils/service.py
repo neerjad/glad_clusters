@@ -8,7 +8,7 @@ from boto3.session import Config
 import numpy as np
 import pandas as pd
 import utils.multiprocess as mp
-from clusters.aws import DynamoDB
+from clusters.convex_hull import ConvexHull
 from pprint import pprint
 
 CSV_ACL='public-read'
@@ -401,6 +401,18 @@ class ClusterService(object):
             return row
         else:
             return row[VIEW_COLUMNS]
+
+
+    def convex_hull(self,row_id):
+        """ get convex_hull vertices for cluster
+            
+            Args:
+                row_id<int>: dataframe index for cluster
+        """
+        alerts=self.dataframe(full=True).iloc[row_id].alerts
+        return ConvexHull(alerts[:,0:2]).hull
+
+
 
 
     #
