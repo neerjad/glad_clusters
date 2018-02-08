@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 from clusters.processors import glad_between_dates
 from utils.service import ClusterService
 
-
+DEFAULT_CENTROIDS=True
+DEFAULT_CONVEXT_HULL=False
 URL_TMPL='{}/{}/{}/{}.png'
 SIZE=256
 VALUE=1
@@ -15,6 +16,8 @@ ROW_FIGSIZE=(18,3)
 CLUSTER_MARKER='o'
 CLUSTER_SIZE=20
 CLUSTER_COLOR='r'
+OVERLAY_ALPHA=0.75
+CONVEX_HULL_COLOR='#00ccff'
 #
 #  
 #
@@ -28,7 +31,7 @@ class ClusterViewer(object):
             url_base<str>: aws-bucket url for glad-tiles (defaults to environ['url'])        
     """
     @staticmethod
-    def show(im,i=None,j=None,ax=None):
+    def show(im=None,i=None,j=None,ax=None,alpha=1):
         if (i and j):
             if isinstance(i,int): 
                 i=[i]
@@ -38,16 +41,17 @@ class ClusterViewer(object):
             else:
                 show=True
                 fig, ax = plt.subplots(1,1, figsize=FIGSIZE)
-            ax.imshow(im)
+            if im is not None: ax.imshow(im,zorder=0,alpha=alpha)
             ax.scatter(j,i,
                 marker=CLUSTER_MARKER,
                 c=CLUSTER_COLOR,
-                s=CLUSTER_SIZE)
+                s=CLUSTER_SIZE,
+                zorder=1)
             if show:
                 plt.show()
-        else:
+        elif im is not None:
             if ax:
-                ax.imshow(im)
+                ax.imshow(im,alpha=alpha)
             else:
                 io.imshow(im)
 
@@ -95,7 +99,7 @@ class ClusterViewer(object):
             return arr
 
 
-    def input(self,row_id,centroids=True,info=True):
+    def input(self,row_id,centroids=DEFAULT_CENTROIDS,info=True):
         """ show the GLAD tile after filtering by date.
 
             Args:
@@ -128,12 +132,17 @@ class ClusterViewer(object):
         ClusterViewer.show(arr,clusters_i,clusters_j)
 
 
-    def cluster(self,row_id,centroids=True,info=True):
+    def cluster(self,
+            row_id,
+            centroids=DEFAULT_CENTROIDS,
+            convex_hull=DEFAULT_CONVEXT_HULL,
+            info=True):
         """ show the cluster
 
             Args:
                 row_id<int>: row id for a cluster on the tile of interest
                 centroids<bool[True]>: if true plot the cluster centroids
+                convex_hull<bool[True]>: if true shade the convex_hull
                 info<bool[True]>: if true print the cluster data
         """
         row=self.service.cluster(row_id,full=True)
@@ -146,10 +155,21 @@ class ClusterViewer(object):
             print("ZXY: {}/{}/{}".format(z,x,y))
             print("DATES: {} to {}".format(dmin,dmax))
         if not centroids: i,j=None,None
-        ClusterViewer.show(alerts,i,j)
+        fig, ax = plt.subplots(1,1, figsize=FIGSIZE)
+        if convex_hull:
+            alpha=OVERLAY_ALPHA
+            self._add_convex_hull(ax,row_id)
+        else:
+            alpha=1
+        ClusterViewer.show(alerts,i,j,ax=ax,alpha=alpha)
 
 
-    def clusters(self,start=None,end=None,row_ids=[],centroids=True):
+    def clusters(self,
+            start=None,
+            end=None,
+            row_ids=[],
+            centroids=DEFAULT_CENTROIDS,
+            convex_hull=DEFAULT_CONVEXT_HULL):
         """ show clusters
             
             Use one of the following:
@@ -158,6 +178,7 @@ class ClusterViewer(object):
 
             Other arguments:
                 centroids<bool[True]>: if true plot the cluster centroids
+                convex_hull<bool[True]>: if true shade the convex_hull
         """
         if row_ids:
             rows=self.service.dataframe(full=True).iloc[row_ids]
@@ -167,7 +188,7 @@ class ClusterViewer(object):
         fig, axs = plt.subplots(1,rows.shape[0], figsize=ROW_FIGSIZE)
         i=0
         for row_id,row in rows.iterrows():
-            self._cluster_axis(axs[i],row,centroids)
+            self._cluster_axis(axs[i],row,centroids,convex_hull)
             i+=1
         plt.show()
 
@@ -187,13 +208,25 @@ class ClusterViewer(object):
             dmin,dmax)
 
 
-    def _cluster_axis(self,ax,row,centroids):
+    def _add_convex_hull(self,ax,row_id=None,alerts=None):
+        ch=self.service.convex_hull(row_id,alerts)
+        ax.fill(ch[:,1],ch[:,0],
+            c=CONVEX_HULL_COLOR,
+            zorder=-1)
+
+
+    def _cluster_axis(self,ax,row,centroids,convex_hull):
         count,area,z,x,y,i,j,dmin,dmax=self._cluster_info(row)
         alerts=self._to_image(row.alerts)
         title='count:{}, area:{}, pt:{},{}'.format(count,area,i,j)
         subtitle='dates: {}, {}'.format(dmin,dmax)
         if not centroids: i,j=None,None                
-        ClusterViewer.show(alerts,i,j,ax=ax)
+        if convex_hull:
+            alpha=OVERLAY_ALPHA
+            self._add_convex_hull(ax,alerts=row.alerts)
+        else:
+            alpha=1
+        ClusterViewer.show(alerts,i,j,ax=ax,alpha=alpha)
         ax.scatter([j],[i],marker='o',c='r',s=20)
         ax.set_title(title)
         ax.set_xlabel(subtitle)

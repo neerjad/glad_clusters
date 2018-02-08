@@ -403,13 +403,15 @@ class ClusterService(object):
             return row[VIEW_COLUMNS]
 
 
-    def convex_hull(self,row_id):
+    def convex_hull(self,row_id=None,alerts=None):
         """ get convex_hull vertices for cluster
             
             Args:
-                row_id<int>: dataframe index for cluster
+                row_id<int>: if not alerts, dataframe row index for cluster
+                alerts<array>: alerts for cluster 
         """
-        alerts=self.dataframe(full=True).iloc[row_id].alerts
+        if alerts is None:
+            alerts=self.dataframe(full=True).iloc[row_id].alerts
         return ConvexHull(alerts[:,0:2]).hull
 
 
