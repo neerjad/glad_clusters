@@ -23,8 +23,12 @@ c.run()
 filename=c.name()
 c.save()
 
-# load previously saved data
-c=ClusterService.read(filename)
+# load previously saved data from params
+c=ClusterService(bounds=bounds)
+c.read()
+
+# OR: load previously saved data from filename
+c=ClusterService.read_csv(filename)
 
 # initialize viewer
 view=ClusterViewer(c)
