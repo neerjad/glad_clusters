@@ -4,57 +4,27 @@ _Clustering with AWS Lambda_
 
 User interaction happens through two main classes:  `ClusterService`, used to run the clustering algorithm, and `ClusterViewer`  used display the data received in a python notebook. _TODO: There is also a command-line-interface for running the clustering algorithm and saving the responses to csv files_
 
-
----
-## ClusterService
-
-```
-from utils.service import ClusterService
-
-# initialize by tile-x,y bounds
-c=ClusterService(tile_bounds=[[1355,2045],[1356,2046]])
-
-# check the number of tiles you are about to run
-c.request_size()
-
-# run by tile x,y values
-%time c.run()
-
-# or fetch the data from a previous run
-%time c.fetch()
-
-# the results as dataframe
-c.view().head()
-
-# sort results by 'area' in descending order 
-c.view().sort_values('area',ascending=False).head()
-
-# the full-results as dataframe (including input data and initial points)
-c.dataframe().head()
-
-# errors that may have occurred 
-c.errors().head()
-
-# a particular row
-c.cluster(row_id=row_id)
-
-# a particular full-row
-c.cluster(row_id=row_id,as_view=False)
-```
-
-
----
-## ClusterViewer
+Python-Doc-Strings have been used throughout.  See the code base or use `help(ClusterService/Viewer)` for documentation.  An complete example is given in this [notebook](https://github.com/wri/mean_shift_lambda/blob/master/nb_archive/ClusterServiceViewer.ipynb), here is a super quick quick-start:
 
 ```
 from utils.service import ClusterService
 from utils.viewer import ClusterViewer
 %matplotlib inline
 
+
+# define lon/lat bounding box:
+bounds=drc_bounds=[[12.1823368669, -13.2572266578], [15.1741492042, -10.25608775474]]
+
 # get data
-c=ClusterService(tile_bounds=[[1355,2045],[1356,2046]])
-%time c.fetch()
-c.view().head()
+c=ClusterService(bounds=bounds)
+c.run()
+
+# save data (grab filename for later use)
+filename=c.name()
+c.save()
+
+# load previously saved data
+c=ClusterService.read(filename)
 
 # initialize viewer
 view=ClusterViewer(c)
