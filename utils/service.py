@@ -95,13 +95,13 @@ class ClusterService(object):
                 errors_dataframe<pandas.dataframe>
     """
     @staticmethod
-    def read(filename,
+    def get_dataframes(filename,
             local=False,
             region=DEFAULT_REGION,
             bucket=DEFAULT_BUCKET,
             url_base=None,
             errors=True):
-        """ init from csv
+        """ get dataframes from csv
 
             Args:
                 filename<str>: name/path of csv without '.csv' extension 
@@ -126,11 +126,38 @@ class ClusterService(object):
             except:
                 edf=None
         else: edf=None
-        params=ClusterService.run_params(df)
+        return df, edf 
+
+
+    @staticmethod
+    def read_csv(filename,
+            local=False,
+            region=DEFAULT_REGION,
+            bucket=DEFAULT_BUCKET,
+            url_base=None,
+            errors=True):
+        """ init service from csv
+
+            Args:
+                filename<str>: name/path of csv without '.csv' extension 
+                local<bool[False]>: if true read from local file else read from s3 file
+                region<str>: aws-region required if not local and not url_base
+                bucket<str>: aws-bucket required if not local
+                url_base<str>: aws-url-root for bucket
+                errors<bool[True]>: if true include errors-csv
+        """
+        df,edf=ClusterService.get_dataframes(
+            filename,
+            local,
+            region,
+            bucket,
+            url_base,
+            errors)
+        run_params=ClusterService.run_params(df)
         return ClusterService(
                 dataframe=df,
                 errors_dataframe=edf,
-                **params)
+                **run_params)
 
 
     @staticmethod
@@ -229,6 +256,24 @@ class ClusterService(object):
                 self.start_date,self.end_date,
                 self.x_min,self.y_min,self.x_max,self.y_max,
                 self.z,self.width,self.min_count,self.iterations)
+
+
+    def read(self,ident=DEFAULT_CSV_IDENT,
+            local=False,
+            region=DEFAULT_REGION,
+            bucket=DEFAULT_BUCKET,
+            url_base=None,
+            errors=True):
+        filename=self.name(ident)
+        df,edf=ClusterService.get_dataframes(
+            filename,
+            local,
+            region,
+            bucket,
+            url_base,
+            errors)
+        self._dataframe=df
+        self._error_dataframe=edf
 
 
     def save(self,
