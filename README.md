@@ -13,7 +13,7 @@ from utils.viewer import ClusterViewer
 
 
 # define lon/lat bounding box:
-bounds=drc_bounds=[[12.1823368669, -13.2572266578], [15.1741492042, -10.25608775474]]
+bounds=[[12.1823368669, -13.2572266578], [15.1741492042, -10.25608775474]]
 
 # get data
 c=ClusterService(bounds=bounds)
