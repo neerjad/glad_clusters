@@ -298,6 +298,7 @@ class ClusterService(object):
                     errors<bool[True]>: if true save errors-csv
         """
         if not filename: filename=self.name(ident)
+        df=self._dataframe.copy()
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         if local:
             self.dataframe(full=True).to_csv(
@@ -319,6 +320,7 @@ class ClusterService(object):
                     "{}.errors.csv".format(filename))
                 obj.put(Body=self.errors().to_csv(None,index=None))
                 obj.Acl().put(ACL=CSV_ACL)
+        self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: np.array(a))
 
 
     def request_size(self):
