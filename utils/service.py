@@ -450,9 +450,7 @@ class ClusterService(object):
         lat_rad=math.radians(lat)
         x=self._N*(lon+180.0)/360
         y=self._N*(1.0-math.log(math.tan(lat_rad)+(1/math.cos(lat_rad)))/math.pi)/2.0
-        # y=(self._N-1)-1
         return int(x),int(y)
-
     
     
     def _lat(self,z,x,y,i,j):
