@@ -2,7 +2,7 @@
 
 _Clustering with AWS Lambda_
 
-User interaction happens through two main classes:  `ClusterService`, used to run the clustering algorithm, and `ClusterViewer`  used display the data received in a python notebook. _TODO: There is also a command-line-interface for running the clustering algorithm and saving the responses to csv files_
+User interaction happens through two main classes:  `ClusterService`, used to run the clustering algorithm, and `ClusterViewer`  used display the data received in a python notebook.
 
 Python-Doc-Strings have been used throughout.  See the code base or use `help(ClusterService/Viewer)` for documentation.  An complete example is given in this [notebook](https://github.com/wri/mean_shift_lambda/blob/master/nb_archive/ClusterServiceViewer.ipynb), here is a super quick quick-start:
 
@@ -83,9 +83,6 @@ sls invoke -f meanshift -l -d '{"z":12,"x":1355,"y":2045,"start_date":"2016-06-0
 
 
 ---
-##### NOTES
-
-_nothing to see here_
 
 
 
