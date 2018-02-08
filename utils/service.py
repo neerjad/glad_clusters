@@ -403,7 +403,6 @@ class ClusterService(object):
             return row[VIEW_COLUMNS]
 
 
-
     #
     #  INTERNAL METHODS
     #

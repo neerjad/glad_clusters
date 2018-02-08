@@ -19,7 +19,14 @@ CLUSTER_COLOR='r'
 #  
 #
 class ClusterViewer(object):
+    """ ClusterViewer:
+                
+        Easily plot data from ClusterService.
 
+        Args:
+            service<cluster_service>: ClusterService instance
+            url_base<str>: aws-bucket url for glad-tiles (defaults to environ['url'])        
+    """
     @staticmethod
     def show(im,i=None,j=None,ax=None):
         if (i and j):
@@ -45,6 +52,9 @@ class ClusterViewer(object):
                 io.imshow(im)
 
 
+    #
+    # PUBLIC METHODS
+    #
     def __init__(self,service,url_base=None):
         self.service=service
         self.url_base=url_base or os.environ.get('url')
@@ -58,6 +68,22 @@ class ClusterViewer(object):
             z=None,
             show=True,
             array=False):
+        """ load tile directly from aws-bucket
+
+            Note: This is the full GLAD tile and has not been filtered by dates.
+
+            Args:
+
+                Use one of the following to identify the tile:
+
+                    row_id<int>: row id for a cluster on the tile of interest
+                    z,x,y<int,int,int>: the z/x/y of the tile
+
+                Other arguments:
+
+                    show<bool[True]>: if true plot the image
+                    array<bool[False]>: if true return the array
+        """
         if row_id:
             if error: df=self.service.errors()
             else: df=self.service.dataframe(full=True)
@@ -70,6 +96,13 @@ class ClusterViewer(object):
 
 
     def input(self,row_id,centroids=True,info=True):
+        """ show the GLAD tile after filtering by date.
+
+            Args:
+                row_id<int>: row id for a cluster on the tile of interest
+                centroids<bool[True]>: if true plot the cluster centroids
+                info<bool[True]>: if true print the clusters data
+        """
         rows=self.service.tile(row_id,full=True)
         count=rows['count'].sum()
         area=rows.area.sum()
@@ -96,6 +129,13 @@ class ClusterViewer(object):
 
 
     def cluster(self,row_id,centroids=True,info=True):
+        """ show the cluster
+
+            Args:
+                row_id<int>: row id for a cluster on the tile of interest
+                centroids<bool[True]>: if true plot the cluster centroids
+                info<bool[True]>: if true print the cluster data
+        """
         row=self.service.cluster(row_id,full=True)
         count,area,z,x,y,i,j,dmin,dmax=self._cluster_info(row)
         alerts=self._to_image(row.alerts)
@@ -110,6 +150,15 @@ class ClusterViewer(object):
 
 
     def clusters(self,start=None,end=None,row_ids=[],centroids=True):
+        """ show clusters
+            
+            Use one of the following:
+                start,end<int,int>: the [start,end) range of rows to show
+                row_ids<list>: list of row ids to show
+
+            Other arguments:
+                centroids<bool[True]>: if true plot the cluster centroids
+        """
         if row_ids:
             rows=self.service.dataframe(full=True).iloc[row_ids]
         else:
@@ -123,6 +172,9 @@ class ClusterViewer(object):
         plt.show()
 
 
+    #
+    # INTERNAL METHODS
+    #
     def _cluster_info(self,row):
         dmin,dmax=ClusterService.int_to_str_dates(
                 row.min_date,
@@ -133,7 +185,6 @@ class ClusterViewer(object):
             row.z,row.x,row.y,
             row.i,row.j,
             dmin,dmax)
-            
 
 
     def _cluster_axis(self,ax,row,centroids):
@@ -162,3 +213,5 @@ class ClusterViewer(object):
 
     def _url(self,z,x,y):
         return URL_TMPL.format(self.url_base,z,x,y)
+
+
