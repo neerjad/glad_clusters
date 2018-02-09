@@ -108,7 +108,7 @@ class ClusterViewer(object):
                 info<bool[True]>: if true print the clusters data
         """
         rows=self.service.tile(row_id,full=True)
-        nb_clusters,count,area,min_date,max_date=service.summary(rows)
+        nb_clusters,count,area,min_date,max_date=self.service.summary(rows)
         r=rows.iloc[0]
         arr=glad_between_dates(
                 io.imread(self._url(r.z,r.x,r.y)),
