@@ -1,4 +1,6 @@
+from __future__ import print_function
 import os
+import argparse
 from datetime import datetime
 import math
 import itertools
@@ -298,7 +300,7 @@ class ClusterService(object):
                     errors<bool[True]>: if true save errors-csv
         """
         if not filename: filename=self.name(ident)
-        df=self._dataframe.copy()
+        if  self._dataframe is None: self._process_responses()
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         if local:
             self.dataframe(full=True).to_csv(
@@ -365,6 +367,21 @@ class ClusterService(object):
             return self._dataframe
         else:
             return self._dataframe[VIEW_COLUMNS]
+
+
+    def summary(self,dataframe=None):
+        """ return nb_clusters,total-count/area,min_date,max_date
+
+            Args:
+                dataframe<dataframe>: if none use self.dataframe()
+        """
+        if dataframe is None: dataframe=self.dataframe()
+        count=dataframe['count'].sum()
+        area=dataframe.area.sum()
+        min_date,max_date=ClusterService.int_to_str_dates(
+                dataframe.min_date.min(),
+                dataframe.max_date.max())
+        return dataframe.shape[0], count, area, min_date, max_date
 
 
     def tile(self,row_id=None,z=DEFAULT_ZOOM,x=None,y=None,full=False):
@@ -637,6 +654,64 @@ class ClusterService(object):
 
 
 
+#
+# Main
+#
+def main():
+    # parsers
+    parser=argparse.ArgumentParser(description='GLAD Cluster Service: Meanshift clustering for GLAD alerts.')
+    # subparsers
+    parser.add_argument('run_type',
+        help='run-type: one of run, info')
+    parser.add_argument('data',
+        help='json string for any of the keyword arguments in ClusterService()')
+    parser.set_defaults(func=_run)
+    # execute
+    args=parser.parse_args()
+    args.func(args)
+
+
+def _run(args):
+    if args.run_type=="run":
+        _run_service(args)
+    elif args.run_type=="info":
+        _print_info(args)
+    else:
+        print("ERROR: {} is not a valid run-type. valid types: [info, run]")
+
+
+def _run_service(args):
+    service=_print_info(args,True)
+    print("\nRUN: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    service.run()
+    nb_clusters,count,area,min_date,max_date=service.summary()
+    print("\tNB CLUSTERS: {}".format(nb_clusters))
+    print("\tTOTAL COUNT: {}".format(count))
+    print("\tTOTAL AREA: {}".format(area))
+    print("\tDATES: {} to {}".format(min_date,max_date))
+    print("SAVE: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    service.save()
+    print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+
+def _print_info(args,return_service=False):
+    kwargs=json.loads(args.data)
+    service=ClusterService(**kwargs)
+    print("\n\nClusterService: {}".format(service.name()))
+    print("\trequest_size:",service.request_size())
+    print("\tbounds:",service.bounds())
+    print("\tdate-range: {} to {}".format(service.start_date,service.end_date))
+    print("\twidth:",service.width)
+    print("\tmin_count:",service.min_count)
+    print("\titerations:",service.iterations)
+    if return_service:
+        return service
+    else:
+        print("\n")
+
+
+if __name__ == "__main__": 
+    main()
 
 
 

@@ -108,11 +108,7 @@ class ClusterViewer(object):
                 info<bool[True]>: if true print the clusters data
         """
         rows=self.service.tile(row_id,full=True)
-        count=rows['count'].sum()
-        area=rows.area.sum()
-        dmin,dmax=ClusterService.int_to_str_dates(
-                rows.min_date.min(),
-                rows.max_date.max())
+        nb_clusters,count,area,min_date,max_date=service.summary(rows)
         r=rows.iloc[0]
         arr=glad_between_dates(
                 io.imread(self._url(r.z,r.x,r.y)),
@@ -128,7 +124,7 @@ class ClusterViewer(object):
             print("NB CLUSTERS: {}".format(rows.shape[0]))
             print("TOTAL COUNT: {}".format(count))
             print("TOTAL AREA: {}".format(area))
-            print("DATES: {} to {}".format(dmin,dmax))
+            print("DATES: {} to {}".format(min_date,max_date))
         ClusterViewer.show(arr,clusters_i,clusters_j)
 
 
