@@ -27,8 +27,8 @@ pip install -e .
 ## QUICK START
 
 ```python
-from utils.service import ClusterService
-from utils.viewer import ClusterViewer
+from glad_clusters.utils.service import ClusterService
+from glad_clusters.utils.viewer import ClusterViewer
 %matplotlib inline
 
 
