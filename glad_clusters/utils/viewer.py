@@ -112,8 +112,8 @@ class ClusterViewer(object):
         r=rows.iloc[0]
         arr=glad_between_dates(
                 io.imread(self._url(r.z,r.x,r.y)),
-                dmin,
-                dmax)
+                min_date,
+                max_date)
         if centroids:
             clusters_i=rows.i.tolist()
             clusters_j=rows.j.tolist()
@@ -142,14 +142,14 @@ class ClusterViewer(object):
                 info<bool[True]>: if true print the cluster data
         """
         row=self.service.cluster(row_id,full=True)
-        count,area,z,x,y,i,j,dmin,dmax=self._cluster_info(row)
+        count,area,z,x,y,i,j,min_date,max_date=self._cluster_info(row)
         alerts=self._to_image(row.alerts)
         if info:
             print("COUNT: {}".format(count))
             print("AREA: {}".format(area))
             print("POINT: {},{}".format(i,j))
             print("ZXY: {}/{}/{}".format(z,x,y))
-            print("DATES: {} to {}".format(dmin,dmax))
+            print("DATES: {} to {}".format(min_date,max_date))
         if not centroids: i,j=None,None
         fig, ax = plt.subplots(1,1, figsize=FIGSIZE)
         if convex_hull:
@@ -193,7 +193,7 @@ class ClusterViewer(object):
     # INTERNAL METHODS
     #
     def _cluster_info(self,row):
-        dmin,dmax=ClusterService.int_to_str_dates(
+        min_date,max_date=ClusterService.int_to_str_dates(
                 row.min_date,
                 row.max_date)
         return (
@@ -201,7 +201,7 @@ class ClusterViewer(object):
             row.area,
             row.z,row.x,row.y,
             row.i,row.j,
-            dmin,dmax)
+            min_date,max_date)
 
 
     def _add_convex_hull(self,ax,row_id=None,alerts=None):
@@ -212,10 +212,10 @@ class ClusterViewer(object):
 
 
     def _cluster_axis(self,ax,row,centroids,convex_hull):
-        count,area,z,x,y,i,j,dmin,dmax=self._cluster_info(row)
+        count,area,z,x,y,i,j,min_date,max_date=self._cluster_info(row)
         alerts=self._to_image(row.alerts)
         title='count:{}, area:{}, pt:{},{}'.format(count,area,i,j)
-        subtitle='dates: {}, {}'.format(dmin,dmax)
+        subtitle='dates: {}, {}'.format(min_date,max_date)
         if not centroids: i,j=None,None                
         if convex_hull:
             alpha=OVERLAY_ALPHA
