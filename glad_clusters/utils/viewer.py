@@ -2,8 +2,8 @@ import os
 import numpy as np
 from skimage import io
 import matplotlib.pyplot as plt
-from clusters.processors import glad_between_dates
-from utils.service import ClusterService
+from glad_clusters.clusters.processors import glad_between_dates
+from glad_clusters.utils.service import ClusterService
 
 DEFAULT_CENTROIDS=True
 DEFAULT_CONVEXT_HULL=False

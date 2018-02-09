@@ -1,8 +1,8 @@
 
 from distutils.core import setup
 setup(
-  name = 'glad_cluster_service',
-  packages = [],
+  name = 'glad_clusters',
+  packages = ['glad_clusters'],
   version = '0.0.0.1',
   description = 'MeanShift Clustering of GLAD alerts with AWS-Lambda',
   author = 'Brookie Guzder-Williams',
@@ -19,7 +19,7 @@ setup(
   classifiers = [],
   entry_points={
       'console_scripts': [
-          'glad_clusters=utils.service:main',
+          'glad_clusters=glad_clusters.utils.service:main'
       ],
   }
 )

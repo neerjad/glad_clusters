@@ -1,7 +1,7 @@
 import math
 import numpy as np
-from clusters.convex_hull import ConvexHull
-import clusters.processors as proc
+from glad_clusters.clusters.convex_hull import ConvexHull
+import glad_clusters.clusters.processors as proc
 
 NOISY=False
 INPUT_DATA=False

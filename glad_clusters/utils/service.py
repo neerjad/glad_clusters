@@ -9,9 +9,9 @@ import boto3
 from boto3.session import Config
 import numpy as np
 import pandas as pd
-import utils.multiprocess as mp
-from clusters.convex_hull import ConvexHull
-from pprint import pprint
+import glad_clusters.utils.multiprocess as mp
+from glad_clusters.clusters.convex_hull import ConvexHull
+
 
 CSV_ACL='public-read'
 S3_URL_TMPL='https://s3-{}.amazonaws.com'
