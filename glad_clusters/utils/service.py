@@ -685,6 +685,7 @@ def _run_service(args):
     service.run()
     nb_clusters,count,area,min_date,max_date=service.summary()
     print("\tNB CLUSTERS: {}".format(nb_clusters))
+    print("\tNB ERRORS: {}".format(service.errors().shape[0]))
     print("\tTOTAL COUNT: {}".format(count))
     print("\tTOTAL AREA: {}".format(area))
     print("\tDATES: {} to {}".format(min_date,max_date))
