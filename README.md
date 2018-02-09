@@ -18,7 +18,7 @@ a super quick quick-start:
 ## INSTALL
 ```
 # clone repo
-git clone https://github.com/wri/mean_shift_lambda.git
+git clone https://github.com/wri/glad_clusters.git
 
 # cd into repo and install with pip
 pip install -e .
