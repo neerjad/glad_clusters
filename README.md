@@ -1,8 +1,8 @@
-# MEAN SHIFT CLUSTERING FOR AWS LAMBDA
+# GLAD CLUSTERS
+_Mean Shift Clustering with AWS Lambda_
 
-_Clustering with AWS Lambda_
-
-User interaction happens through two main classes:  `ClusterService`, used to run the clustering algorithm, and `ClusterViewer`  used display the data received in a python notebook.
+This package uses AWS-Lambda to perform meanshift clustering on GLAD tiles.
+User interaction happens through two main classes:  `ClusterService`, used to run the clustering algorithm/read the clustered data, and `ClusterViewer`  used display the data received in a python notebook. Additionally there is a [CLI](#cli) that allows you to run the cluster algorithm from the command-line. 
 
 Python-Doc-Strings have been used throughout.  See the code base or use `help(ClusterService/Viewer)` for documentation.  An complete example is given in this [notebook](https://github.com/wri/mean_shift_lambda/blob/master/nb_archive/ClusterServiceViewer.ipynb), 
 
