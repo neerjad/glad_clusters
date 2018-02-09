@@ -378,7 +378,7 @@ class ClusterService(object):
                     otherwise only return VIEW_COLUMNS
         """
         df=self.dataframe(full=True)
-        if row_id:
+        if row_id is not None:
             row=df.iloc[row_id]
             z,x,y=row.z,row.x,row.y
         df=df[((df.z==z)&(df.x==x)&(df.y==y))]
