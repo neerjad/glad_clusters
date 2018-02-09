@@ -11,11 +11,9 @@ Python-Doc-Strings have been used throughout.  See the code base or use `help(Cl
 3. [Command Line Interface](#cli)
 4. [Dev](#dev)
 
-a super quick quick-start:
-
 <a name='install'></a>
----
 ## INSTALL
+
 ```
 # clone repo
 git clone https://github.com/wri/glad_clusters.git
@@ -26,7 +24,6 @@ pip install -e .
 
 
 <a name='quick'></a>
----
 ## QUICK START
 
 ```python
@@ -71,7 +68,6 @@ view.clusters(start=182,end=185)
 
 
 <a name='cli'></a>
----
 ## COMMAND-LINE-INTERFACE
 
 When you use pip to install the cluster service a CLI is installed along with it. There are two optional "run_types": `info` which just returns data about a potential run, and `run` which runs the service and saves the data.
@@ -130,7 +126,6 @@ optional arguments:
 
 
 <a name='dev'></a>
----
 ## DEVELOPMENT
 
 ##### SERVERLESS
