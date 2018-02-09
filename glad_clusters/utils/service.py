@@ -690,13 +690,14 @@ def _run_service(args):
     print("\tDATES: {} to {}".format(min_date,max_date))
     print("SAVE: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     service.save()
+    print("\tfilename: {}".format(service.name()))
     print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
 
 def _print_info(args,return_service=False):
     kwargs=json.loads(args.data)
     service=ClusterService(**kwargs)
-    print("\n\nClusterService: {}".format(service.name()))
+    print("\n\nClusterService:")
     print("\trequest_size:",service.request_size())
     print("\tbounds:",service.bounds())
     print("\tdate-range: {} to {}".format(service.start_date,service.end_date))

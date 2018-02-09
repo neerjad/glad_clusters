@@ -29,7 +29,7 @@ pip install -e .
 ---
 ## QUICK START
 
-```
+```python
 from utils.service import ClusterService
 from utils.viewer import ClusterViewer
 %matplotlib inline
@@ -77,11 +77,11 @@ view.clusters(start=182,end=185)
 When you use pip to install the cluster service a CLI is installed along with it. There are two optional "run_types": `info` which just returns data about a potential run, and `run` which runs the service and saves the data.
 
 #### EXAMPLE
-```
+```bash
 $ glad_clusters info '{"x":1365,"y":2082}'
 
 
-ClusterService: clusters_2015-01-01:2018-02-09_1365:2082:1365:2082_12:5:25:25
+ClusterService:
     request_size: 1
     bounds: [[-60.029296875, -2.98692739333487], [-59.94175091911765, -3.0743508993624977]]
     date-range: 2015-01-01 to 2018-02-09
@@ -93,7 +93,7 @@ ClusterService: clusters_2015-01-01:2018-02-09_1365:2082:1365:2082_12:5:25:25
 $ glad_clusters run '{"x":1365,"y":2082}'
 
 
-ClusterService: clusters_2015-01-01:2018-02-09_1365:2082:1365:2082_12:5:25:25
+ClusterService:
     request_size: 1
     bounds: [[-60.029296875, -2.98692739333487], [-59.94175091911765, -3.0743508993624977]]
     date-range: 2015-01-01 to 2018-02-09
@@ -101,20 +101,22 @@ ClusterService: clusters_2015-01-01:2018-02-09_1365:2082:1365:2082_12:5:25:25
     min_count: 25
     iterations: 25
 
-RUN: 2018-02-09 12:04:51
+RUN: 2018-02-09 13:12:59
     NB CLUSTERS: 20
     TOTAL COUNT: 1455
     TOTAL AREA: 7996
     DATES: 2015-03-28 to 2018-01-30
-SAVE: 2018-02-09 12:05:05
-COMPLETE: 2018-02-09 12:05:06
+SAVE: 2018-02-09 13:13:14
+    filename: clusters_2015-01-01:2018-02-09_1365:2082:1365:2082_12:5:25:25
+COMPLETE: 2018-02-09 13:13:15
 
 
+$ 
 ```
 
 
 #### HELP DOCS
-```
+```bash
 $ glad_clusters --help
 usage: glad_clusters [-h] run_type data
 
