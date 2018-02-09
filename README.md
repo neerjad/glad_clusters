@@ -74,7 +74,7 @@ view.clusters(start=182,end=185)
 ---
 ## COMMAND-LINE-INTERFACE
 
-When you use pip to install the cluster service a CLI is installed along with it. There are two optional `run_types`: `info` which just returns data about a potential run, and `run` which runs the service and saves the data.
+When you use pip to install the cluster service a CLI is installed along with it. There are two optional "run_types": `info` which just returns data about a potential run, and `run` which runs the service and saves the data.
 
 #### EXAMPLE
 ```
