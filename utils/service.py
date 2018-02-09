@@ -1,5 +1,5 @@
 import os
-from time import sleep
+from datetime import datetime
 import math
 import itertools
 import json
@@ -15,7 +15,7 @@ CSV_ACL='public-read'
 S3_URL_TMPL='https://s3-{}.amazonaws.com'
 DEFAULT_REGION='us-west-2'
 DEFAULT_START_DATE='2015-01-01'
-DEFAULT_END_DATE='2025-01-01'
+DEFAULT_END_DATE=datetime.now().strftime("%Y-%m-%d")
 DEFAULT_MIN_COUNT=25
 DEFAULT_WIDTH=5
 DEFAULT_ITERATIONS=25
@@ -367,7 +367,7 @@ class ClusterService(object):
             return self._dataframe[VIEW_COLUMNS]
 
 
-    def tile(self,row_id=None,z=None,x=None,y=None,full=False):
+    def tile(self,row_id=None,z=DEFAULT_ZOOM,x=None,y=None,full=False):
         """ return rows matching z,x,y
 
             Args:
