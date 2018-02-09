@@ -653,7 +653,6 @@ class ClusterService(object):
         return np.prod(test).astype(bool)
 
 
-
 #
 # Main
 #
