@@ -61,7 +61,11 @@ ERROR_COLUMNS=[
     'error',
     'error_trace']
 
-BOTO3_CONFIG={ 'read_timeout': 600 }
+BOTO3_CONFIG={ 
+    'read_timeout': 600,
+    'region_name': 'us-east-1'
+}
+
 MAX_PROCESSES=200
 
 class ClusterService(object):

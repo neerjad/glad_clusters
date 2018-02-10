@@ -29,6 +29,7 @@ package-lock.json
 package.json
 venv/
 notebooks/
+playground*
 
 # Serverless directories
 .serverless
