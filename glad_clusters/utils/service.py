@@ -121,10 +121,7 @@ class ClusterService(object):
             dfpath='{}.csv'.format(filename)
             if errors: edfpath='{}.errors.csv'.format(filename)
         else:
-            if not url_base: url_base=S3_URL_TMPL.format(region)
-            url_base="{}/{}".format(url_base,bucket)
-            dfpath='{}/{}.csv'.format(url_base,filename)
-            if errors: edfpath='{}/{}.errors.csv'.format(url_base,filename)
+            dfpath,edfpath=ClusterService.get_urls(filename,region,bucket,url_base,errors)
         df=pd.read_csv(dfpath,converters=CONVERTERS)
         if errors: 
             try:
@@ -133,6 +130,32 @@ class ClusterService(object):
                 edf=None
         else: edf=None
         return df, edf 
+
+
+
+    @staticmethod
+    def get_urls(filename,
+            region=DEFAULT_REGION,
+            bucket=DEFAULT_BUCKET,
+            url_base=None,
+            errors=True):
+        """ get urls for dataframe csvs
+
+            Args:
+                filename<str>: name/path of csv without '.csv' extension 
+                region<str>: aws-region required if not local and not url_base
+                bucket<str>: aws-bucket required if not local
+                url_base<str>: aws-url-root for bucket
+                errors<bool[True]>: if true include errors-csv-url
+        """
+        if not url_base: url_base=S3_URL_TMPL.format(region)
+        url_base="{}/{}".format(url_base,bucket)
+        dfpath='{}/{}.csv'.format(url_base,filename)
+        if errors: 
+            edfpath='{}/{}.errors.csv'.format(url_base,filename)
+            return dfpath, edfpath
+        else:
+            return dfpath     
 
 
     @staticmethod
@@ -262,6 +285,20 @@ class ClusterService(object):
                 self.start_date,self.end_date,
                 self.x_min,self.y_min,self.x_max,self.y_max,
                 self.z,self.width,self.min_count,self.iterations)
+
+
+    def urls(self,
+            ident=DEFAULT_CSV_IDENT,
+            region=DEFAULT_REGION,
+            bucket=DEFAULT_BUCKET,
+            url_base=None,
+            errors=True):
+        return ClusterService.get_urls(
+            self.name(ident),
+            region,
+            bucket,
+            url_base,
+            errors)
 
 
     def read(self,ident=DEFAULT_CSV_IDENT,
