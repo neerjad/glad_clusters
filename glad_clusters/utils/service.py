@@ -215,6 +215,24 @@ class ClusterService(object):
         edate="{}-{}-{}".format(edate[:4],edate[4:6],edate[6:])
         return sdate, edate
 
+
+    @staticmethod
+    def lat(z,x,y,i=0,j=0):
+        """ latitude from z/x/y/i/j
+        """
+        lat_rad=math.atan(math.sinh(math.pi*(1-(2*(y+(j/255.0))/(2**z)))))
+        lat=(lat_rad*180.0)/math.pi
+        return lat
+
+
+    @staticmethod
+    def lon(z,x,y,i=0,j=0):
+        """ longitude from z/x/y/i/j
+        """        
+        lon=(360.0/(2**z))*(x+(i/255.0))-180.0
+        return lon
+
+
     #
     #  PUBLC METHODS
     #    
@@ -244,7 +262,6 @@ class ClusterService(object):
         self.bucket=bucket
         self._dataframe=dataframe
         self._error_dataframe=errors_dataframe
-        self._N=(2**self.z)
         self._set_tile_bounds(bounds,tile_bounds,lon,lat,x,y)
 
 
@@ -375,10 +392,10 @@ class ClusterService(object):
     def bounds(self):
         """ get lat/lon-bounds
         """
-        lat_min=self._lat(self.z,self.x_min,self.y_min,0,0)
-        lat_max=self._lat(self.z,self.x_max,self.y_max,254.0,254.0)
-        lon_min=self._lon(self.z,self.x_min,self.y_min,0,0)
-        lon_max=self._lon(self.z,self.x_max,self.y_max,254.0,254.0)
+        lat_min=ClusterService.lat(self.z,self.x_min,self.y_min,0,0)
+        lat_max=ClusterService.lat(self.z,self.x_max,self.y_max,254.0,254.0)
+        lon_min=ClusterService.lon(self.z,self.x_min,self.y_min,0,0)
+        lon_max=ClusterService.lon(self.z,self.x_max,self.y_max,254.0,254.0)
         return [[lon_min,lat_min],[lon_max,lat_max]]
 
 
@@ -567,20 +584,9 @@ class ClusterService(object):
             
     def _lonlat_to_xy(self,lon,lat):
         lat_rad=math.radians(lat)
-        x=self._N*(lon+180.0)/360
-        y=self._N*(1.0-math.log(math.tan(lat_rad)+(1/math.cos(lat_rad)))/math.pi)/2.0
+        x=(2**self.z)*(lon+180.0)/360
+        y=(2**self.z)*(1.0-math.log(math.tan(lat_rad)+(1/math.cos(lat_rad)))/math.pi)/2.0
         return int(x),int(y)
-    
-    
-    def _lat(self,z,x,y,i,j):
-        lat_rad=math.atan(math.sinh(math.pi*(1-(2*(y+(j/255.0))/self._N))))
-        lat=(lat_rad*180.0)/math.pi
-        return lat
-
-
-    def _lon(self,z,x,y,i,j):
-        lon=(360.0/self._N)*(x+(i/255.0))-180.0
-        return lon
 
 
     def _process_response(self,x,y,response):
@@ -667,8 +673,8 @@ class ClusterService(object):
                     int(cluster.get('area')),
                     cluster.get('min_date'),
                     cluster.get('max_date'),
-                    self._lat(z,x,y,i,j),
-                    self._lon(z,x,y,i,j),
+                    ClusterService.lon(z,x,y,i,j),
+                    ClusterService.lat(z,x,y,i,j),
                     z,x,y,i,j,
                     response['file_name'],
                     response['timestamp'],
@@ -682,8 +688,8 @@ class ClusterService(object):
         x=response.get('x')
         y=response.get('y')
         if (z and x and y):
-            lat=self._lat(int(z),int(x),int(y),128,128)
-            lon=self._lon(int(z),int(x),int(y),128,128)
+            lon=ClusterService.lon(int(z),int(x),int(y),128,128)
+            lat=ClusterService.lat(int(z),int(x),int(y),128,128)
         else:
             lon,lat=None,None
         return [z,x,y,lon,lat,error,error_trace]
