@@ -310,6 +310,7 @@ class ClusterService(object):
             bucket=DEFAULT_BUCKET,
             url_base=None,
             errors=True):
+        """ construct urls. using  default filename """
         return ClusterService.get_urls(
             self.name(ident),
             region,
