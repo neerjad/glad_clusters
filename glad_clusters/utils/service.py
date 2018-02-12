@@ -220,7 +220,7 @@ class ClusterService(object):
     def lat(z,x,y,i=0,j=0):
         """ latitude from z/x/y/i/j
         """
-        lat_rad=math.atan(math.sinh(math.pi*(1-(2*(y+(j/255.0))/(2**z)))))
+        lat_rad=math.atan(math.sinh(math.pi*(1-(2*(y+(j/256.0))/(2**z)))))
         lat=(lat_rad*180.0)/math.pi
         return lat
 
@@ -229,7 +229,7 @@ class ClusterService(object):
     def lon(z,x,y,i=0,j=0):
         """ longitude from z/x/y/i/j
         """        
-        lon=(360.0/(2**z))*(x+(i/255.0))-180.0
+        lon=(360.0/(2**z))*(x+(i/256.0))-180.0
         return lon
 
 
