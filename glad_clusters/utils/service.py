@@ -10,63 +10,61 @@ from boto3.session import Config
 import numpy as np
 import pandas as pd
 import glad_clusters.utils.multiprocess as mp
+import psycopg2
 from glad_clusters.clusters.convex_hull import ConvexHull
 
+CSV_ACL = 'public-read'
+S3_URL_TMPL = 'https://s3-{}.amazonaws.com'
+DEFAULT_REGION = 'us-west-2'
+DEFAULT_START_DATE = '2015-01-01'
+DEFAULT_END_DATE = datetime.now().strftime("%Y-%m-%d")
+DEFAULT_MIN_COUNT = 25
+DEFAULT_WIDTH = 5
+DEFAULT_ITERATIONS = 25
+DEFAULT_ZOOM = 12
+DELETE_RESPONSES = True
+DEFAULT_BUCKET = 'gfw-clusters-test'
+LAMBDA_FUNCTION_NAME = 'gfw-glad-clusters-v1-dev-meanshift'
+DEFAULT_CSV_IDENT = 'clusters'
+CSV_NAME_TMPL = "{}_{}:{}_{}:{}:{}:{}_{}:{}:{}:{}"
+CONVERTERS = {"alerts": lambda r: np.array(json.loads(r))}
 
-CSV_ACL='public-read'
-S3_URL_TMPL='https://s3-{}.amazonaws.com'
-DEFAULT_REGION='us-west-2'
-DEFAULT_START_DATE='2015-01-01'
-DEFAULT_END_DATE=datetime.now().strftime("%Y-%m-%d")
-DEFAULT_MIN_COUNT=25
-DEFAULT_WIDTH=5
-DEFAULT_ITERATIONS=25
-DEFAULT_ZOOM=12
-DELETE_RESPONSES=True
-DEFAULT_BUCKET='gfw-clusters-test'
-LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
-DEFAULT_CSV_IDENT='clusters'
-CSV_NAME_TMPL="{}_{}:{}_{}:{}:{}:{}_{}:{}:{}:{}"
-CONVERTERS={ "alerts" :lambda r: np.array(json.loads(r)) }
-
-
-DATAFRAME_COLUMNS=[
+DATAFRAME_COLUMNS = [
     'count',
     'area',
     'min_date',
     'max_date',
     'longitude',
     'latitude',
-    'z','x','y','i','j',
+    'z', 'x', 'y', 'i', 'j',
     'file_name',
     'timestamp',
     'alerts']
 
-
-VIEW_COLUMNS=[
+VIEW_COLUMNS = [
     'count',
     'area',
     'min_date',
     'max_date',
     'longitude',
     'latitude',
-    'x','y',
+    'x', 'y',
     'timestamp']
 
-
-ERROR_COLUMNS=[
-    'z','x','y',
+ERROR_COLUMNS = [
+    'z', 'x', 'y',
     'centroid_longitude',
     'centroid_latitude',
     'error',
     'error_trace']
 
-BOTO3_CONFIG={ 
+BOTO3_CONFIG = {
     'read_timeout': 600,
     'region_name': 'us-east-1'
 }
 
-MAX_PROCESSES=200
+MAX_PROCESSES = 200
+
 
 class ClusterService(object):
     """ ClusterService:
@@ -100,13 +98,14 @@ class ClusterService(object):
                 dataframe<pandas.dataframe>,
                 errors_dataframe<pandas.dataframe>
     """
+
     @staticmethod
     def get_dataframes(filename,
-            local=False,
-            region=DEFAULT_REGION,
-            bucket=DEFAULT_BUCKET,
-            url_base=None,
-            errors=True):
+                       local=False,
+                       region=DEFAULT_REGION,
+                       bucket=DEFAULT_BUCKET,
+                       url_base=None,
+                       errors=True):
         """ get dataframes from csv
 
             Args:
@@ -118,27 +117,26 @@ class ClusterService(object):
                 errors<bool[True]>: if true include errors-csv
         """
         if local:
-            dfpath='{}.csv'.format(filename)
-            if errors: edfpath='{}.errors.csv'.format(filename)
+            dfpath = '{}.csv'.format(filename)
+            if errors: edfpath = '{}.errors.csv'.format(filename)
         else:
-            dfpath,edfpath=ClusterService.get_urls(filename,region,bucket,url_base,errors)
-        df=pd.read_csv(dfpath,converters=CONVERTERS)
-        if errors: 
+            dfpath, edfpath = ClusterService.get_urls(filename, region, bucket, url_base, errors)
+        df = pd.read_csv(dfpath, converters=CONVERTERS)
+        if errors:
             try:
-                edf=pd.read_csv(edfpath)
+                edf = pd.read_csv(edfpath)
             except:
-                edf=None
-        else: edf=None
-        return df, edf 
-
-
+                edf = None
+        else:
+            edf = None
+        return df, edf
 
     @staticmethod
     def get_urls(filename,
-            region=DEFAULT_REGION,
-            bucket=DEFAULT_BUCKET,
-            url_base=None,
-            errors=True):
+                 region=DEFAULT_REGION,
+                 bucket=DEFAULT_BUCKET,
+                 url_base=None,
+                 errors=True):
         """ get urls for dataframe csvs
 
             Args:
@@ -148,23 +146,22 @@ class ClusterService(object):
                 url_base<str>: aws-url-root for bucket
                 errors<bool[True]>: if true include errors-csv-url
         """
-        if not url_base: url_base=S3_URL_TMPL.format(region)
-        url_base="{}/{}".format(url_base,bucket)
-        dfpath='{}/{}.csv'.format(url_base,filename)
-        if errors: 
-            edfpath='{}/{}.errors.csv'.format(url_base,filename)
+        if not url_base: url_base = S3_URL_TMPL.format(region)
+        url_base = "{}/{}".format(url_base, bucket)
+        dfpath = '{}/{}.csv'.format(url_base, filename)
+        if errors:
+            edfpath = '{}/{}.errors.csv'.format(url_base, filename)
             return dfpath, edfpath
         else:
-            return dfpath     
-
+            return dfpath
 
     @staticmethod
     def read_csv(filename,
-            local=False,
-            region=DEFAULT_REGION,
-            bucket=DEFAULT_BUCKET,
-            url_base=None,
-            errors=True):
+                 local=False,
+                 region=DEFAULT_REGION,
+                 bucket=DEFAULT_BUCKET,
+                 url_base=None,
+                 errors=True):
         """ init service from csv
 
             Args:
@@ -175,97 +172,91 @@ class ClusterService(object):
                 url_base<str>: aws-url-root for bucket
                 errors<bool[True]>: if true include errors-csv
         """
-        df,edf=ClusterService.get_dataframes(
+        df, edf = ClusterService.get_dataframes(
             filename,
             local,
             region,
             bucket,
             url_base,
             errors)
-        run_params=ClusterService.run_params(df)
+        run_params = ClusterService.run_params(df)
         return ClusterService(
-                dataframe=df,
-                errors_dataframe=edf,
-                **run_params)
-
+            dataframe=df,
+            errors_dataframe=edf,
+            **run_params)
 
     @staticmethod
     def run_params(dataframe):
         """ return run params based on dataframe
         """
-        z=int(dataframe.iloc[0].z)
-        x_min,y_min=dataframe[['x','y']].min().tolist()
-        x_max,y_max=dataframe[['x','y']].max().tolist()
-        sdate,edate=ClusterService.int_to_str_dates(
-                dataframe.min_date.min(),
-                dataframe.max_date.max())
+        z = int(dataframe.iloc[0].z)
+        x_min, y_min = dataframe[['x', 'y']].min().tolist()
+        x_max, y_max = dataframe[['x', 'y']].max().tolist()
+        sdate, edate = ClusterService.int_to_str_dates(
+            dataframe.min_date.min(),
+            dataframe.max_date.max())
         return {
             'z': z,
-            'tile_bounds': [[x_min,y_min],[x_max,y_max]],
+            'tile_bounds': [[x_min, y_min], [x_max, y_max]],
             'start_date': sdate,
-            'end_date': edate }
-
+            'end_date': edate}
 
     @staticmethod
-    def int_to_str_dates(sdate,edate):
+    def int_to_str_dates(sdate, edate):
         """ convert date ints to date strs
         """
-        sdate, edate=str(sdate), str(edate)
-        sdate="{}-{}-{}".format(sdate[:4],sdate[4:6],sdate[6:])
-        edate="{}-{}-{}".format(edate[:4],edate[4:6],edate[6:])
+        sdate, edate = str(sdate), str(edate)
+        sdate = "{}-{}-{}".format(sdate[:4], sdate[4:6], sdate[6:])
+        edate = "{}-{}-{}".format(edate[:4], edate[4:6], edate[6:])
         return sdate, edate
 
-
     @staticmethod
-    def lat(z,x,y,i=0,j=0):
+    def lat(z, x, y, i=0, j=0):
         """ latitude from z/x/y/i/j
         """
-        lat_rad=math.atan(math.sinh(math.pi*(1-(2*(y+(j/256.0))/(2**z)))))
-        lat=(lat_rad*180.0)/math.pi
+        lat_rad = math.atan(math.sinh(math.pi * (1 - (2 * (y + (j / 256.0)) / (2 ** z)))))
+        lat = (lat_rad * 180.0) / math.pi
         return lat
 
-
     @staticmethod
-    def lon(z,x,y,i=0,j=0):
+    def lon(z, x, y, i=0, j=0):
         """ longitude from z/x/y/i/j
-        """        
-        lon=(360.0/(2**z))*(x+(i/256.0))-180.0
+        """
+        lon = (360.0 / (2 ** z)) * (x + (i / 256.0)) - 180.0
         return lon
-
 
     #
     #  PUBLC METHODS
     #    
     def __init__(self,
-            bounds=None,
-            tile_bounds=None,
-            lat=None,
-            lon=None,
-            x=None,
-            y=None,
-            start_date=DEFAULT_START_DATE,
-            end_date=DEFAULT_END_DATE,
-            min_count=DEFAULT_MIN_COUNT,
-            width=DEFAULT_WIDTH,
-            iterations=DEFAULT_ITERATIONS,
-            z=DEFAULT_ZOOM,
-            bucket=DEFAULT_BUCKET,
-            dataframe=None,
-            errors_dataframe=None):
+                 bounds=None,
+                 tile_bounds=None,
+                 lat=None,
+                 lon=None,
+                 x=None,
+                 y=None,
+                 start_date=DEFAULT_START_DATE,
+                 end_date=DEFAULT_END_DATE,
+                 min_count=DEFAULT_MIN_COUNT,
+                 width=DEFAULT_WIDTH,
+                 iterations=DEFAULT_ITERATIONS,
+                 z=DEFAULT_ZOOM,
+                 bucket=DEFAULT_BUCKET,
+                 dataframe=None,
+                 errors_dataframe=None):
         self._init_properties()
-        self.start_date=start_date
-        self.end_date=end_date
-        self.min_count=min_count
-        self.width=width
-        self.iterations=iterations
-        self.z=z
-        self.bucket=bucket
-        self._dataframe=dataframe
-        self._error_dataframe=errors_dataframe
-        self._set_tile_bounds(bounds,tile_bounds,lon,lat,x,y)
+        self.start_date = start_date
+        self.end_date = end_date
+        self.min_count = min_count
+        self.width = width
+        self.iterations = iterations
+        self.z = z
+        self.bucket = bucket
+        self._dataframe = dataframe
+        self._error_dataframe = errors_dataframe
+        self._set_tile_bounds(bounds, tile_bounds, lon, lat, x, y)
 
-
-    def run(self,max_processes=MAX_PROCESSES,force=False):
+    def run(self, max_processes=MAX_PROCESSES, force=False):
         """ find clusters on tiles
 
             Args:
@@ -277,39 +268,37 @@ class ClusterService(object):
         else:
             try:
                 # self.responses=None
-                self.lambda_client=boto3.client('lambda',config=Config(**BOTO3_CONFIG))
+                self.lambda_client = boto3.client('lambda', config=Config(**BOTO3_CONFIG))
                 if (self.x and self.y):
-                    self.responses=[self._run_tile()]
+                    self.responses = [self._run_tile()]
                 else:
-                    xys=itertools.product(
-                        range(self.x_min,self.x_max+1),
-                        range(self.y_min,self.y_max+1))
-                    self.responses=mp.map_with_threadpool(
+                    xys = itertools.product(
+                        range(self.x_min, self.x_max + 1),
+                        range(self.y_min, self.y_max + 1))
+                    self.responses = mp.map_with_threadpool(
                         self._run_tile,
                         list(xys),
                         max_processes=max_processes)
-                self._dataframe=None
-                self._errors=None
+                self._dataframe = None
+                self._errors = None
             except Exception as e:
                 print("ERROR: run failure -- {}".format(e))
 
-
-    def name(self,ident=DEFAULT_CSV_IDENT):
+    def name(self, ident=DEFAULT_CSV_IDENT):
         """ construct service name. use as default filename
         """
         return CSV_NAME_TMPL.format(
-                ident,
-                self.start_date,self.end_date,
-                self.x_min,self.y_min,self.x_max,self.y_max,
-                self.z,self.width,self.min_count,self.iterations)
-
+            ident,
+            self.start_date, self.end_date,
+            self.x_min, self.y_min, self.x_max, self.y_max,
+            self.z, self.width, self.min_count, self.iterations)
 
     def urls(self,
-            ident=DEFAULT_CSV_IDENT,
-            region=DEFAULT_REGION,
-            bucket=DEFAULT_BUCKET,
-            url_base=None,
-            errors=True):
+             ident=DEFAULT_CSV_IDENT,
+             region=DEFAULT_REGION,
+             bucket=DEFAULT_BUCKET,
+             url_base=None,
+             errors=True):
         """ construct urls. using  default filename """
         return ClusterService.get_urls(
             self.name(ident),
@@ -318,31 +307,29 @@ class ClusterService(object):
             url_base,
             errors)
 
-
-    def read(self,ident=DEFAULT_CSV_IDENT,
-            local=False,
-            region=DEFAULT_REGION,
-            bucket=DEFAULT_BUCKET,
-            url_base=None,
-            errors=True):
-        filename=self.name(ident)
-        df,edf=ClusterService.get_dataframes(
+    def read(self, ident=DEFAULT_CSV_IDENT,
+             local=False,
+             region=DEFAULT_REGION,
+             bucket=DEFAULT_BUCKET,
+             url_base=None,
+             errors=True):
+        filename = self.name(ident)
+        df, edf = ClusterService.get_dataframes(
             filename,
             local,
             region,
             bucket,
             url_base,
             errors)
-        self._dataframe=df
-        self._error_dataframe=edf
-
+        self._dataframe = df
+        self._error_dataframe = edf
 
     def save(self,
-            ident=DEFAULT_CSV_IDENT,
-            filename=None,
-            local=False,
-            bucket=None,
-            errors=True):
+             ident=DEFAULT_CSV_IDENT,
+             filename=None,
+             local=False,
+             bucket=None,
+             errors=True):
         """ write responses to csv
 
             Args:
@@ -358,9 +345,9 @@ class ClusterService(object):
                     bucket<str>: aws-bucket required if not local and not self.bucket
                     errors<bool[True]>: if true save errors-csv
         """
-        if not filename: filename=self.name(ident)
-        if  self._dataframe is None: self._process_responses()
-        self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
+        if not filename: filename = self.name(ident)
+        if self._dataframe is None: self._process_responses()
+        self._dataframe['alerts'] = self._dataframe['alerts'].apply(lambda a: a.tolist())
         if local:
             self.dataframe(full=True).to_csv(
                 "{}.csv".format(filename),
@@ -370,49 +357,231 @@ class ClusterService(object):
                     "{}.errors.csv".format(filename),
                     index=None)
         else:
-            obj=boto3.resource('s3').Object(
+            obj = boto3.resource('s3').Object(
                 bucket or self.bucket,
                 "{}.csv".format(filename))
-            obj.put(Body=self.dataframe(full=True).to_csv(None,index=None))
+            obj.put(Body=self.dataframe(full=True).to_csv(None, index=None))
             obj.Acl().put(ACL=CSV_ACL)
             if errors and self.errors().shape[0]:
-                obj=boto3.resource('s3').Object(
+                obj = boto3.resource('s3').Object(
                     bucket or self.bucket,
                     "{}.errors.csv".format(filename))
-                obj.put(Body=self.errors().to_csv(None,index=None))
+                obj.put(Body=self.errors().to_csv(None, index=None))
                 obj.Acl().put(ACL=CSV_ACL)
-        self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: np.array(a))
+        self._dataframe['alerts'] = self._dataframe['alerts'].apply(lambda a: np.array(a))
 
+    def export(self,
+               ident=DEFAULT_CSV_IDENT,
+               temp_dir=None,
+               pg_table=None,
+               pg_conn=None,
+               overwrite=False
+               ):
+        """ write responses to csv
+
+            Args:
+
+                Use one of the following:
+            
+
+                    ident<str[DEFAULT_CSV_IDENT]>: prefix to default_name
+                    temp_dir<str>: Temporary folder for CSV export
+                    pg_table<str>: PG table name
+                    pg_conn<dict>: PostgreSQL connection with the following keys
+                        dbname<string>: Database name.
+                        port<integer>: Port.
+                        user<string>: User name.
+                        password<string>: Password.
+                        host<string>: Server hostname.
+
+                Other arguments:
+                
+                    overwrite<bool[False]>: if true write overwrite existing data
+
+        """
+
+        if not pg_table:
+            pg_table = self.name(ident).replace(":", "").replace("-", "")
+
+        # TODO add temp_dir to local_env
+        filename = os.path.join(temp_dir, pg_table + ".csv")
+
+        if self._dataframe is None:
+            self._process_responses()
+
+        self._dataframe['alerts'] = self._dataframe['alerts'].apply(
+            lambda a: str(a.tolist()).replace('[', '{').replace(']', '}'))
+        self.dataframe(full=True).to_csv(filename, index=None)
+
+        # if errors and self.errors().shape[0]:
+        #     self.errors().to_csv("{}.errors.csv".format(filename), index=None)
+
+        pg_user = pg_conn["user"]
+        pg_password = pg_conn["password"]
+        pg_dbname = pg_conn["dbname"]
+
+        if "host" in pg_conn.keys():
+            pg_host = pg_conn["host"]
+        else:
+            pg_host = "localhost"
+
+        if "port" in pg_conn.keys():
+            pg_port = pg_conn["port"]
+        else:
+            pg_port = "5432"
+
+        if not pg_table:
+            pg_table = os.path.basename(filename)
+
+        conn = psycopg2.connect(database=pg_dbname, user=pg_user, password=pg_password, host=pg_host, port=pg_port)
+        cur = conn.cursor()
+
+        exists = False
+        try:
+            cur.execute("SELECT * FROM {} LIMIT 1;".format(pg_table))
+            exists = True
+        except Exception, e:
+            if psycopg2.errorcodes.lookup(e.pgcode) == 'UNDEFINED_TABLE':
+                exists = False
+            else:
+                exists = True  # probably redundant...
+
+        if overwrite and exists:
+            cur.execute("DELETE FROM {};".format(pg_table))
+
+        elif not exists:
+            sql = """
+                CREATE TABLE {0}
+                (
+                  index integer NOT NULL,
+                  count integer,
+                  area integer,
+                  min_date integer,
+                  max_date integer,
+                  longitude double precision,
+                  latitude double precision,
+                  z integer,
+                  x integer,
+                  y integer,
+                  i integer,
+                  j integer,
+                  file_name text,
+                  "timestamp" text,
+                  alerts integer[],
+                  CONSTRAINT {0}_pkey PRIMARY KEY (index)
+                )
+                WITH (
+                  OIDS=FALSE
+                );
+    
+                select AddGeometryColumn('{0}', 'multipoint', 4326, 'MULTIPOINT', 3);
+                select AddGeometryColumn('{0}', 'concave', 4326, 'POLYGON', 2);
+    
+                CREATE INDEX {0}_index_idx
+                  ON {0}
+                  USING btree
+                  (index);
+                  
+                CREATE INDEX {0}_multipoint_idx
+                  ON {0}
+                  USING gist
+                  (multipoint);
+    
+    
+                CREATE INDEX {0}_concave_idx
+                  ON {0}
+                  USING gist
+                  (concave);""".format(pg_table)
+
+            cur.execute(sql)
+
+        else:
+            raise Exception('PG table already exist and overwrite set to false.')
+
+        sql = """
+                CREATE OR REPLACE FUNCTION unnest_2d_1d(anyarray)
+                  RETURNS SETOF anyarray AS
+                $BODY$
+                SELECT array_agg($1[d1][d2])
+                FROM   generate_subscripts($1,1) d1
+                    ,  generate_subscripts($1,2) d2
+                GROUP  BY d1
+                ORDER  BY d1
+                $BODY$
+                  LANGUAGE sql IMMUTABLE
+                  COST 100
+                  ROWS 1000;
+                  
+                CREATE OR REPLACE FUNCTION sinh(x numeric)
+                  RETURNS double precision AS
+                $BODY$
+                        BEGIN
+                                RETURN (exp(x) - exp(-x))/2;
+                        END;
+                $BODY$
+                  LANGUAGE plpgsql VOLATILE
+                  COST 100;
+    
+                COPY {0}(index,count,area,min_date,max_date,longitude,latitude,z,x,y,i,j,file_name,timestamp,alerts) 
+                FROM '{1}' DELIMITER ',' CSV HEADER;
+    
+                WITH t AS (SELECT "index" AS id, z, x, y, unnest_2d_1d(alerts) AS alerts FROM {0})
+                UPDATE {0}
+                SET multipoint = g.multipoint
+                FROM
+                (SELECT 
+                    id, 
+                    st_collect(
+                    ST_SetSRID(ST_MakePoint(
+                        (360.0/(2^z))*(x+(alerts[2]/256.0))-180.0,
+                        (atan(sinh((pi()*(1-(2*(y+(alerts[1]/256.0))/(2^z))))::numeric))*180.0)/pi(),
+                        alerts[3]),
+                    4326)) AS multipoint
+                FROM t
+                GROUP BY id) AS g
+                WHERE "index" = id;
+    
+                UPDATE {0}
+                SET concave = ST_ConcaveHull (multipoint, 0.99);
+            """.format(pg_table, filename)
+
+        cur.execute(sql)
+        conn.commit()
+        cur.close()
+        conn.close()
+
+        self._dataframe['alerts'] = self._dataframe['alerts'].apply(lambda a: np.array(a))
+
+        print("Data successfully exported to table {}".format(pg_table))
+
+        return
 
     def request_size(self):
         """ get number of tiles in request
         """
-        return (self.x_max-self.x_min+1)*(self.y_max-self.y_min+1)
-
+        return (self.x_max - self.x_min + 1) * (self.y_max - self.y_min + 1)
 
     def bounds(self):
         """ get lat/lon-bounds
         """
-        lat_min=ClusterService.lat(self.z,self.x_min,self.y_min,0,0)
-        lat_max=ClusterService.lat(self.z,self.x_max,self.y_max,254.0,254.0)
-        lon_min=ClusterService.lon(self.z,self.x_min,self.y_min,0,0)
-        lon_max=ClusterService.lon(self.z,self.x_max,self.y_max,254.0,254.0)
-        return [[lon_min,lat_min],[lon_max,lat_max]]
-
+        lat_min = ClusterService.lat(self.z, self.x_min, self.y_min, 0, 0)
+        lat_max = ClusterService.lat(self.z, self.x_max, self.y_max, 254.0, 254.0)
+        lon_min = ClusterService.lon(self.z, self.x_min, self.y_min, 0, 0)
+        lon_max = ClusterService.lon(self.z, self.x_max, self.y_max, 254.0, 254.0)
+        return [[lon_min, lat_min], [lon_max, lat_max]]
 
     def bounding_box(self):
         """ get lat/lon bounding box
         """
-        mins,maxes=self.bounds()
+        mins, maxes = self.bounds()
         return [
-            [mins[0],mins[1]],
-            [maxes[0],mins[1]],
-            [maxes[0],maxes[1]],
-            [mins[0],maxes[1]],
-            [mins[0],mins[1]]]
+            [mins[0], mins[1]],
+            [maxes[0], mins[1]],
+            [maxes[0], maxes[1]],
+            [mins[0], maxes[1]],
+            [mins[0], mins[1]]]
 
-
-    def dataframe(self,full=False):
+    def dataframe(self, full=False):
         """ return dataframe of clusters data
 
             Args:
@@ -420,30 +589,28 @@ class ClusterService(object):
                     if true return full dataframe
                     otherwise only return VIEW_COLUMNS
         """
-        if  self._dataframe is None:
+        if self._dataframe is None:
             self._process_responses()
         if full:
             return self._dataframe
         else:
             return self._dataframe[VIEW_COLUMNS]
 
-
-    def summary(self,dataframe=None):
+    def summary(self, dataframe=None):
         """ return nb_clusters,total-count/area,min_date,max_date
 
             Args:
                 dataframe<dataframe>: if none use self.dataframe()
         """
-        if dataframe is None: dataframe=self.dataframe()
-        count=dataframe['count'].sum()
-        area=dataframe.area.sum()
-        min_date,max_date=ClusterService.int_to_str_dates(
-                dataframe.min_date.min(),
-                dataframe.max_date.max())
+        if dataframe is None: dataframe = self.dataframe()
+        count = dataframe['count'].sum()
+        area = dataframe.area.sum()
+        min_date, max_date = ClusterService.int_to_str_dates(
+            dataframe.min_date.min(),
+            dataframe.max_date.max())
         return dataframe.shape[0], count, area, min_date, max_date
 
-
-    def tile(self,row_id=None,z=DEFAULT_ZOOM,x=None,y=None,full=False):
+    def tile(self, row_id=None, z=DEFAULT_ZOOM, x=None, y=None, full=False):
         """ return rows matching z,x,y
 
             Args:
@@ -453,32 +620,30 @@ class ClusterService(object):
                     if true return full dataframe
                     otherwise only return VIEW_COLUMNS
         """
-        df=self.dataframe(full=True)
+        df = self.dataframe(full=True)
         if row_id is not None:
-            row=df.iloc[row_id]
-            z,x,y=row.z,row.x,row.y
-        df=df[((df.z==z)&(df.x==x)&(df.y==y))]
+            row = df.iloc[row_id]
+            z, x, y = row.z, row.x, row.y
+        df = df[((df.z == z) & (df.x == x) & (df.y == y))]
         if full:
             return df
         else:
             return df[VIEW_COLUMNS]
 
-
     def errors(self):
         """ return error dataframe
         """
-        if  self._dataframe is None:
+        if self._dataframe is None:
             self._process_responses()
         return self._error_dataframe
 
-
     def cluster(self,
-            row_id=None,
-            lat=None,lon=None,
-            z=None,x=None,y=None,i=None,j=None,
-            timestamp=None,
-            ascending=False,
-            full=False):
+                row_id=None,
+                lat=None, lon=None,
+                z=None, x=None, y=None, i=None, j=None,
+                timestamp=None,
+                ascending=False,
+                full=False):
         """ fetch data for single cluster
 
             Method for selecting row of dataframe
@@ -503,30 +668,29 @@ class ClusterService(object):
                         else include all columns (including input/alerts data)
         """
         if self._not_none([row_id]):
-            row=self.dataframe(full=True).iloc[row_id]
+            row = self.dataframe(full=True).iloc[row_id]
         else:
-            test=True
-            if self._not_none([lon,lat]):
-                test=test & (
-                    (self.dataframe(full=True).latitude==lat) & 
-                    (self.dataframe(full=True).longitude==lon))
-            elif self._not_none([x,y,z]):
-                test=test & (
-                    (self.dataframe(full=True).z==z) & 
-                    (self.dataframe(full=True).x==x) & 
-                    (self.dataframe(full=True).y==y))
+            test = True
+            if self._not_none([lon, lat]):
+                test = test & (
+                    (self.dataframe(full=True).latitude == lat) &
+                    (self.dataframe(full=True).longitude == lon))
+            elif self._not_none([x, y, z]):
+                test = test & (
+                    (self.dataframe(full=True).z == z) &
+                    (self.dataframe(full=True).x == x) &
+                    (self.dataframe(full=True).y == y))
             if timestamp:
-                test=test & (self.dataframe(full=True).timestamp==timestamp)
-            rows=self.dataframe(full=True)[test]
-            if ascending: rows.sort_values('timestamp',inplace=True)
-            row=rows.iloc[0]
+                test = test & (self.dataframe(full=True).timestamp == timestamp)
+            rows = self.dataframe(full=True)[test]
+            if ascending: rows.sort_values('timestamp', inplace=True)
+            row = rows.iloc[0]
         if full:
             return row
         else:
             return row[VIEW_COLUMNS]
 
-
-    def convex_hull(self,row_id=None,alerts=None):
+    def convex_hull(self, row_id=None, alerts=None):
         """ get convex_hull vertices for cluster
             
             Args:
@@ -534,73 +698,65 @@ class ClusterService(object):
                 alerts<array>: alerts for cluster 
         """
         if alerts is None:
-            alerts=self.dataframe(full=True).iloc[row_id].alerts
-        return ConvexHull(alerts[:,0:2]).hull
-
-
-
+            alerts = self.dataframe(full=True).iloc[row_id].alerts
+        return ConvexHull(alerts[:, 0:2]).hull
 
     #
     #  INTERNAL METHODS
     #
     def _init_properties(self):
-        self.x=None
-        self.y=None
+        self.x = None
+        self.y = None
 
-
-    def _request_data(self,x,y,as_dict=False):
-        data={
-            "z":self.z,
-            "x":x,
-            "y":y,
-            "start_date":self.start_date,
-            "end_date":self.end_date,
-            "min_count":self.min_count,
-            "width":self.width,
-            "iterations":self.iterations }
+    def _request_data(self, x, y, as_dict=False):
+        data = {
+            "z": self.z,
+            "x": x,
+            "y": y,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "min_count": self.min_count,
+            "width": self.width,
+            "iterations": self.iterations}
         if as_dict:
             return data
         else:
             return json.dumps(data)
 
-    
-    def _set_tile_bounds(self,bounds,tile_bounds,lon,lat,x,y):
+    def _set_tile_bounds(self, bounds, tile_bounds, lon, lat, x, y):
         """
             NOTE: if a single pair (x,y) or (lon,lat) the x,y-values 
             will be set for the find_by_tile method.
         """
         if bounds:
-            tile_bounds=[self._lonlat_to_xy(*lonlat) for lonlat in bounds]
+            tile_bounds = [self._lonlat_to_xy(*lonlat) for lonlat in bounds]
         elif (lat and lon):
-            self.x,self.y=self._lonlat_to_xy(lon,lat)
-            tile_bounds=[[self.x,self.y],[self.x,self.y]]
+            self.x, self.y = self._lonlat_to_xy(lon, lat)
+            tile_bounds = [[self.x, self.y], [self.x, self.y]]
         elif (x and y):
-            self.x=int(x)
-            self.y=int(y)
-            tile_bounds=[[self.x,self.y],[self.x,self.y]]
-        tile_bounds=np.array(tile_bounds).astype(int)
-        self.x_min,self.y_min=tile_bounds.min(axis=0)
-        self.x_max,self.y_max=tile_bounds.max(axis=0)
-            
-            
-    def _lonlat_to_xy(self,lon,lat):
-        lat_rad=math.radians(lat)
-        x=(2**self.z)*(lon+180.0)/360
-        y=(2**self.z)*(1.0-math.log(math.tan(lat_rad)+(1/math.cos(lat_rad)))/math.pi)/2.0
-        return int(x),int(y)
+            self.x = int(x)
+            self.y = int(y)
+            tile_bounds = [[self.x, self.y], [self.x, self.y]]
+        tile_bounds = np.array(tile_bounds).astype(int)
+        self.x_min, self.y_min = tile_bounds.min(axis=0)
+        self.x_max, self.y_max = tile_bounds.max(axis=0)
 
+    def _lonlat_to_xy(self, lon, lat):
+        lat_rad = math.radians(lat)
+        x = (2 ** self.z) * (lon + 180.0) / 360
+        y = (2 ** self.z) * (1.0 - math.log(math.tan(lat_rad) + (1 / math.cos(lat_rad))) / math.pi) / 2.0
+        return int(x), int(y)
 
-    def _process_response(self,x,y,response):
+    def _process_response(self, x, y, response):
         if response:
-            payload=json.loads(response.get('Payload',{}).read())
-            processed_response=self._request_data(x,y,as_dict=True)
+            payload = json.loads(response.get('Payload', {}).read())
+            processed_response = self._request_data(x, y, as_dict=True)
             if payload:
                 processed_response.update(payload)
             return processed_response
         return None
 
-
-    def _run_tile(self,location=None,x=None,y=None):
+    def _run_tile(self, location=None, x=None, y=None):
         """ find clusters on tile
         
             NOTE: if no args are passed it will attempt to use 
@@ -611,33 +767,32 @@ class ClusterService(object):
                 x<int>: tile x value
                 y<int>: tile y value
         """
-        if location: x,y=location
+        if location: x, y = location
         if not (x and y):
-            x=self.x
-            y=self.y
+            x = self.x
+            y = self.y
         if (x and y):
             try:
-                response=self.lambda_client.invoke(
+                response = self.lambda_client.invoke(
                     FunctionName=LAMBDA_FUNCTION_NAME,
                     InvocationType='RequestResponse',
                     LogType='Tail',
-                    Payload=self._request_data(x,y))
-                return self._process_response(x,y,response)
+                    Payload=self._request_data(x, y))
+                return self._process_response(x, y, response)
             except Exception as e:
-                error_data=self._request_data(x,y,as_dict=True)
-                error_data['data']={ 'x':x, 'y': y }
-                error_data['error']="{}".format(e)
-                error_data['error_trace']="service.1"
+                error_data = self._request_data(x, y, as_dict=True)
+                error_data['data'] = {'x': x, 'y': y}
+                error_data['error'] = "{}".format(e)
+                error_data['error_trace'] = "service.1"
                 return error_data
 
-
     def _process_responses(self):
-        rows,error_rows=self._dataframes_rows()
-        self._dataframe=pd.DataFrame(
-            rows, 
+        rows, error_rows = self._dataframes_rows()
+        self._dataframe = pd.DataFrame(
+            rows,
             columns=DATAFRAME_COLUMNS)
-        self._error_dataframe=pd.DataFrame(
-            error_rows, 
+        self._error_dataframe = pd.DataFrame(
+            error_rows,
             columns=ERROR_COLUMNS)
         self._dataframe.sort_values(
             'timestamp',
@@ -645,59 +800,55 @@ class ClusterService(object):
             inplace=True)
         self._dataframe.reset_index(inplace=True)
         self._error_dataframe.reset_index(inplace=True)
-        if DELETE_RESPONSES: self.responses=None
-
+        if DELETE_RESPONSES: self.responses = None
 
     def _dataframes_rows(self):
-        rows=[]
-        error_rows=[]
+        rows = []
+        error_rows = []
         for response in self.responses:
             if response:
-                error=response.get('error') or response.get('errorMessage')
+                error = response.get('error') or response.get('errorMessage')
                 if error:
-                    error_rows.append(self._error_row(error,response))
+                    error_rows.append(self._error_row(error, response))
                 else:
-                    rows+=self._response_rows(response)
-        return rows,error_rows
+                    rows += self._response_rows(response)
+        return rows, error_rows
 
-
-    def _response_rows(self,response):
-        rrows=[]
-        z=int(response.get('z'))
-        x=int(response.get('x'))
-        y=int(response.get('y'))
-        for cluster in response.get('data',{}).get('clusters',[]):
-            i=int(cluster.get('i'))
-            j=int(cluster.get('j'))
+    def _response_rows(self, response):
+        rrows = []
+        z = int(response.get('z'))
+        x = int(response.get('x'))
+        y = int(response.get('y'))
+        for cluster in response.get('data', {}).get('clusters', []):
+            i = int(cluster.get('i'))
+            j = int(cluster.get('j'))
             rrows.append([
-                    int(cluster.get('count')),
-                    int(cluster.get('area')),
-                    cluster.get('min_date'),
-                    cluster.get('max_date'),
-                    ClusterService.lon(z,x,y,i,j),
-                    ClusterService.lat(z,x,y,i,j),
-                    z,x,y,i,j,
-                    response['file_name'],
-                    response['timestamp'],
-                    np.array(cluster.get('alerts')).astype(int)])
+                int(cluster.get('count')),
+                int(cluster.get('area')),
+                cluster.get('min_date'),
+                cluster.get('max_date'),
+                ClusterService.lon(z, x, y, i, j),
+                ClusterService.lat(z, x, y, i, j),
+                z, x, y, i, j,
+                response['file_name'],
+                response['timestamp'],
+                np.array(cluster.get('alerts')).astype(int)])
         return rrows
 
-
-    def _error_row(self,error,response):
-        error_trace=response.get('error_trace','service.2')
-        z=response.get('z') or self.z
-        x=response.get('x')
-        y=response.get('y')
+    def _error_row(self, error, response):
+        error_trace = response.get('error_trace', 'service.2')
+        z = response.get('z') or self.z
+        x = response.get('x')
+        y = response.get('y')
         if (z and x and y):
-            lon=ClusterService.lon(int(z),int(x),int(y),128,128)
-            lat=ClusterService.lat(int(z),int(x),int(y),128,128)
+            lon = ClusterService.lon(int(z), int(x), int(y), 128, 128)
+            lat = ClusterService.lat(int(z), int(x), int(y), 128, 128)
         else:
-            lon,lat=None,None
-        return [z,x,y,lon,lat,error,error_trace]
+            lon, lat = None, None
+        return [z, x, y, lon, lat, error, error_trace]
 
-
-    def _not_none(self,values):
-        test=[ (val is not None) for val in values ]
+    def _not_none(self, values):
+        test = [(val is not None) for val in values]
         return np.prod(test).astype(bool)
 
 
@@ -706,61 +857,58 @@ class ClusterService(object):
 #
 def main():
     # parsers
-    parser=argparse.ArgumentParser(description='GLAD Cluster Service: Meanshift clustering for GLAD alerts.')
+    parser = argparse.ArgumentParser(description='GLAD Cluster Service: Meanshift clustering for GLAD alerts.')
     # subparsers
     parser.add_argument('run_type',
-        help='run-type: one of run, info')
+                        help='run-type: one of run, info')
     parser.add_argument('data',
-        help='json string for any of the keyword arguments in ClusterService()')
+                        help='json string for any of the keyword arguments in ClusterService()')
     parser.set_defaults(func=_run)
     # execute
-    args=parser.parse_args()
+    args = parser.parse_args()
     args.func(args)
 
 
 def _run(args):
-    if args.run_type=="run":
+    if args.run_type == "run":
         _run_service(args)
-    elif args.run_type=="info":
+    elif args.run_type == "info":
         _print_info(args)
     else:
         print("ERROR: {} is not a valid run-type. valid types: [info, run]")
 
 
 def _run_service(args):
-    service=_print_info(args,True)
+    service = _print_info(args, True)
     print("\nRUN: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     service.run()
-    nb_clusters,count,area,min_date,max_date=service.summary()
+    nb_clusters, count, area, min_date, max_date = service.summary()
     print("\tNB CLUSTERS: {}".format(nb_clusters))
     print("\tNB ERRORS: {}".format(service.errors().shape[0]))
     print("\tTOTAL COUNT: {}".format(count))
     print("\tTOTAL AREA: {}".format(area))
-    print("\tDATES: {} to {}".format(min_date,max_date))
+    print("\tDATES: {} to {}".format(min_date, max_date))
     print("SAVE: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     service.save()
     print("\tfilename: {}".format(service.name()))
     print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
 
-def _print_info(args,return_service=False):
-    kwargs=json.loads(args.data)
-    service=ClusterService(**kwargs)
+def _print_info(args, return_service=False):
+    kwargs = json.loads(args.data)
+    service = ClusterService(**kwargs)
     print("\n\nClusterService:")
-    print("\trequest_size:",service.request_size())
-    print("\tbounds:",service.bounds())
-    print("\tdate-range: {} to {}".format(service.start_date,service.end_date))
-    print("\twidth:",service.width)
-    print("\tmin_count:",service.min_count)
-    print("\titerations:",service.iterations)
+    print("\trequest_size:", service.request_size())
+    print("\tbounds:", service.bounds())
+    print("\tdate-range: {} to {}".format(service.start_date, service.end_date))
+    print("\twidth:", service.width)
+    print("\tmin_count:", service.min_count)
+    print("\titerations:", service.iterations)
     if return_service:
         return service
     else:
         print("\n")
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     main()
-
-
-
