@@ -372,6 +372,7 @@ class ClusterService(object):
 
     def export(self,
                ident=DEFAULT_CSV_IDENT,
+               format="PG",
                temp_dir=None,
                pg_table=None,
                pg_conn=None,
@@ -400,159 +401,164 @@ class ClusterService(object):
 
         """
 
-        if not pg_table:
-            pg_table = self.name(ident).replace(":", "").replace("-", "")
+        if format == "PG":
 
-        # TODO add temp_dir to local_env
-        filename = os.path.join(temp_dir, pg_table + ".csv")
+            if not pg_table:
+                pg_table = self.name(ident).replace(":", "").replace("-", "")
 
-        if self._dataframe is None:
-            self._process_responses()
+            # TODO add temp_dir to local_env
+            filename = os.path.join(temp_dir, pg_table + ".csv")
 
-        self._dataframe['alerts'] = self._dataframe['alerts'].apply(
-            lambda a: str(a.tolist()).replace('[', '{').replace(']', '}'))
-        self.dataframe(full=True).to_csv(filename, index=None)
+            if self._dataframe is None:
+                self._process_responses()
 
-        # if errors and self.errors().shape[0]:
-        #     self.errors().to_csv("{}.errors.csv".format(filename), index=None)
+            self._dataframe['alerts'] = self._dataframe['alerts'].apply(
+                lambda a: str(a.tolist()).replace('[', '{').replace(']', '}'))
+            self.dataframe(full=True).to_csv(filename, index=None)
 
-        pg_user = pg_conn["user"]
-        pg_password = pg_conn["password"]
-        pg_dbname = pg_conn["dbname"]
+            # if errors and self.errors().shape[0]:
+            #     self.errors().to_csv("{}.errors.csv".format(filename), index=None)
 
-        if "host" in pg_conn.keys():
-            pg_host = pg_conn["host"]
-        else:
-            pg_host = "localhost"
+            pg_user = pg_conn["user"]
+            pg_password = pg_conn["password"]
+            pg_dbname = pg_conn["dbname"]
 
-        if "port" in pg_conn.keys():
-            pg_port = pg_conn["port"]
-        else:
-            pg_port = "5432"
-
-        if not pg_table:
-            pg_table = os.path.basename(filename)
-
-        conn = psycopg2.connect(database=pg_dbname, user=pg_user, password=pg_password, host=pg_host, port=pg_port)
-        cur = conn.cursor()
-
-        exists = False
-        try:
-            cur.execute("SELECT * FROM {} LIMIT 1;".format(pg_table))
-            exists = True
-        except Exception, e:
-            if psycopg2.errorcodes.lookup(e.pgcode) == 'UNDEFINED_TABLE':
-                exists = False
+            if "host" in pg_conn.keys():
+                pg_host = pg_conn["host"]
             else:
-                exists = True  # probably redundant...
+                pg_host = "localhost"
 
-        if overwrite and exists:
-            cur.execute("DELETE FROM {};".format(pg_table))
+            if "port" in pg_conn.keys():
+                pg_port = pg_conn["port"]
+            else:
+                pg_port = "5432"
 
-        elif not exists:
+            if not pg_table:
+                pg_table = os.path.basename(filename)
+
+            conn = psycopg2.connect(database=pg_dbname, user=pg_user, password=pg_password, host=pg_host, port=pg_port)
+            cur = conn.cursor()
+
+            exists = False
+            try:
+                cur.execute("SELECT * FROM {} LIMIT 1;".format(pg_table))
+                exists = True
+            except Exception, e:
+                if psycopg2.errorcodes.lookup(e.pgcode) == 'UNDEFINED_TABLE':
+                    exists = False
+                else:
+                    exists = True  # probably redundant...
+
+            if overwrite and exists:
+                cur.execute("DELETE FROM {};".format(pg_table))
+
+            elif not exists:
+                sql = """
+                    CREATE TABLE {0}
+                    (
+                      index integer NOT NULL,
+                      count integer,
+                      area integer,
+                      min_date integer,
+                      max_date integer,
+                      longitude double precision,
+                      latitude double precision,
+                      z integer,
+                      x integer,
+                      y integer,
+                      i integer,
+                      j integer,
+                      file_name text,
+                      "timestamp" text,
+                      alerts integer[],
+                      CONSTRAINT {0}_pkey PRIMARY KEY (index)
+                    )
+                    WITH (
+                      OIDS=FALSE
+                    );
+        
+                    select AddGeometryColumn('{0}', 'multipoint', 4326, 'MULTIPOINT', 3);
+                    select AddGeometryColumn('{0}', 'concave', 4326, 'POLYGON', 2);
+        
+                    CREATE INDEX {0}_index_idx
+                      ON {0}
+                      USING btree
+                      (index);
+                      
+                    CREATE INDEX {0}_multipoint_idx
+                      ON {0}
+                      USING gist
+                      (multipoint);
+        
+        
+                    CREATE INDEX {0}_concave_idx
+                      ON {0}
+                      USING gist
+                      (concave);""".format(pg_table)
+
+                cur.execute(sql)
+
+            else:
+                raise Exception('PG table already exist and overwrite set to false.')
+
             sql = """
-                CREATE TABLE {0}
-                (
-                  index integer NOT NULL,
-                  count integer,
-                  area integer,
-                  min_date integer,
-                  max_date integer,
-                  longitude double precision,
-                  latitude double precision,
-                  z integer,
-                  x integer,
-                  y integer,
-                  i integer,
-                  j integer,
-                  file_name text,
-                  "timestamp" text,
-                  alerts integer[],
-                  CONSTRAINT {0}_pkey PRIMARY KEY (index)
-                )
-                WITH (
-                  OIDS=FALSE
-                );
-    
-                select AddGeometryColumn('{0}', 'multipoint', 4326, 'MULTIPOINT', 3);
-                select AddGeometryColumn('{0}', 'concave', 4326, 'POLYGON', 2);
-    
-                CREATE INDEX {0}_index_idx
-                  ON {0}
-                  USING btree
-                  (index);
-                  
-                CREATE INDEX {0}_multipoint_idx
-                  ON {0}
-                  USING gist
-                  (multipoint);
-    
-    
-                CREATE INDEX {0}_concave_idx
-                  ON {0}
-                  USING gist
-                  (concave);""".format(pg_table)
+                    CREATE OR REPLACE FUNCTION unnest_2d_1d(anyarray)
+                      RETURNS SETOF anyarray AS
+                    $BODY$
+                    SELECT array_agg($1[d1][d2])
+                    FROM   generate_subscripts($1,1) d1
+                        ,  generate_subscripts($1,2) d2
+                    GROUP  BY d1
+                    ORDER  BY d1
+                    $BODY$
+                      LANGUAGE sql IMMUTABLE
+                      COST 100
+                      ROWS 1000;
+                      
+                    CREATE OR REPLACE FUNCTION sinh(x numeric)
+                      RETURNS double precision AS
+                    $BODY$
+                            BEGIN
+                                    RETURN (exp(x) - exp(-x))/2;
+                            END;
+                    $BODY$
+                      LANGUAGE plpgsql VOLATILE
+                      COST 100;
+        
+                    COPY {0}(index,count,area,min_date,max_date,longitude,latitude,z,x,y,i,j,file_name,timestamp,alerts) 
+                    FROM '{1}' DELIMITER ',' CSV HEADER;
+        
+                    WITH t AS (SELECT "index" AS id, z, x, y, unnest_2d_1d(alerts) AS alerts FROM {0})
+                    UPDATE {0}
+                    SET multipoint = g.multipoint
+                    FROM
+                    (SELECT 
+                        id, 
+                        st_collect(
+                        ST_SetSRID(ST_MakePoint(
+                            (360.0/(2^z))*(x+(alerts[2]/256.0))-180.0,
+                            (atan(sinh((pi()*(1-(2*(y+(alerts[1]/256.0))/(2^z))))::numeric))*180.0)/pi(),
+                            alerts[3]),
+                        4326)) AS multipoint
+                    FROM t
+                    GROUP BY id) AS g
+                    WHERE "index" = id;
+        
+                    UPDATE {0}
+                    SET concave = ST_ConcaveHull (multipoint, 0.99);
+                """.format(pg_table, filename)
 
             cur.execute(sql)
+            conn.commit()
+            cur.close()
+            conn.close()
+
+            self._dataframe['alerts'] = self._dataframe['alerts'].apply(lambda a: np.array(a))
+
+            print("Data successfully exported to table {}".format(pg_table))
 
         else:
-            raise Exception('PG table already exist and overwrite set to false.')
-
-        sql = """
-                CREATE OR REPLACE FUNCTION unnest_2d_1d(anyarray)
-                  RETURNS SETOF anyarray AS
-                $BODY$
-                SELECT array_agg($1[d1][d2])
-                FROM   generate_subscripts($1,1) d1
-                    ,  generate_subscripts($1,2) d2
-                GROUP  BY d1
-                ORDER  BY d1
-                $BODY$
-                  LANGUAGE sql IMMUTABLE
-                  COST 100
-                  ROWS 1000;
-                  
-                CREATE OR REPLACE FUNCTION sinh(x numeric)
-                  RETURNS double precision AS
-                $BODY$
-                        BEGIN
-                                RETURN (exp(x) - exp(-x))/2;
-                        END;
-                $BODY$
-                  LANGUAGE plpgsql VOLATILE
-                  COST 100;
-    
-                COPY {0}(index,count,area,min_date,max_date,longitude,latitude,z,x,y,i,j,file_name,timestamp,alerts) 
-                FROM '{1}' DELIMITER ',' CSV HEADER;
-    
-                WITH t AS (SELECT "index" AS id, z, x, y, unnest_2d_1d(alerts) AS alerts FROM {0})
-                UPDATE {0}
-                SET multipoint = g.multipoint
-                FROM
-                (SELECT 
-                    id, 
-                    st_collect(
-                    ST_SetSRID(ST_MakePoint(
-                        (360.0/(2^z))*(x+(alerts[2]/256.0))-180.0,
-                        (atan(sinh((pi()*(1-(2*(y+(alerts[1]/256.0))/(2^z))))::numeric))*180.0)/pi(),
-                        alerts[3]),
-                    4326)) AS multipoint
-                FROM t
-                GROUP BY id) AS g
-                WHERE "index" = id;
-    
-                UPDATE {0}
-                SET concave = ST_ConcaveHull (multipoint, 0.99);
-            """.format(pg_table, filename)
-
-        cur.execute(sql)
-        conn.commit()
-        cur.close()
-        conn.close()
-
-        self._dataframe['alerts'] = self._dataframe['alerts'].apply(lambda a: np.array(a))
-
-        print("Data successfully exported to table {}".format(pg_table))
+            raise Exception('Unsupported format.')
 
         return
 
