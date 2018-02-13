@@ -7,6 +7,7 @@ User interaction happens through two main classes:  `ClusterService`, used to ru
 Python-Doc-Strings have been used throughout.  See the code base or use `help(ClusterService/Viewer)` for documentation.  An complete example is given in this [notebook](https://github.com/wri/mean_shift_lambda/blob/master/nb_archive/ClusterServiceViewer.ipynb), 
 
 1. [Install](#install)
+1. [Pixel Coordinates and Image Data](#coords)
 2. [Super Quick Quick Start](#quick)
 3. [Command Line Interface](#cli)
 4. [Dev](#dev)
@@ -21,6 +22,13 @@ git clone https://github.com/wri/glad_clusters.git
 # cd into repo and install with pip
 pip install -e .
 ```
+
+<a name='coords'></a>
+## A SHORT NOTE ON COORDINATES
+
+_TLDR; Alert data values are \[j, i, days\-since\-20150101\], where j is the pixel coordinate along the y axis and i is the pixel coordinate along the x axis._
+
+As is standard, we use `z/x/y` to represent our tile coordinates. `i` and `j`  are used for the pixel coordinates within the tile, which run along the `x` and `y` axis respectively. Note however we are using skimage whose reads in numpy arrays where the first position is along the `y` axis and the second is along the `x` axis.  It is important to keep in mind then that the alerts column in `cluster_service.dataframe(full=True)`  gives a list of alert data whose values are [j, i, days-since-20150101], rather than the more intuitive [i,j,...].
 
 
 <a name='quick'></a>
