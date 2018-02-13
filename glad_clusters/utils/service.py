@@ -363,11 +363,11 @@ class ClusterService(object):
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         if local:
             self.dataframe(full=True).to_csv(
-                "{}.to_csv".format(filename),
+                "{}.csv".format(filename),
                 index=None)
             if errors and self.errors().shape[0]:
                 self.errors().to_csv(
-                    "{}.errors.to_csv".format(filename),
+                    "{}.errors.csv".format(filename),
                     index=None)
         else:
             obj=boto3.resource('s3').Object(
