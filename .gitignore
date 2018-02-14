@@ -34,5 +34,5 @@ playground*
 # Serverless directories
 .serverless
 
-#pycharm
+# pycharm
 .idea/
