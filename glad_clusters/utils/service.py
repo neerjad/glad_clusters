@@ -11,9 +11,11 @@ import pandas as pd
 import glad_clusters.utils.multiprocess as mp
 import psycopg2
 from glad_clusters.clusters.convex_hull import ConvexHull
+import inspect
+from argparse import ArgumentParser
+
 from optparse import OptionParser
 from optparse import OptionGroup
-s
 
 
 CSV_ACL='public-read'
@@ -391,7 +393,11 @@ class ClusterService(object):
                format="PG",
                temp_dir=None,
                pg_table=None,
-               pg_conn=None,
+               pg_dbname=None,
+               pg_host="localhost",
+               pg_port=5432,
+               pg_user=None,
+               pg_password=None,
                overwrite=False
                ):
         """ write responses to csv
@@ -434,20 +440,6 @@ class ClusterService(object):
 
             # if errors and self.errors().shape[0]:
             #     self.errors().to_csv("{}.errors.csv".format(filename), index=None)
-
-            pg_user = pg_conn["user"]
-            pg_password = pg_conn["password"]
-            pg_dbname = pg_conn["dbname"]
-
-            if "host" in pg_conn.keys():
-                pg_host = pg_conn["host"]
-            else:
-                pg_host = "localhost"
-
-            if "port" in pg_conn.keys():
-                pg_port = pg_conn["port"]
-            else:
-                pg_port = "5432"
 
             if not pg_table:
                 pg_table = os.path.basename(filename)
@@ -576,7 +568,7 @@ class ClusterService(object):
         else:
             raise Exception('Unsupported format.')
 
-        return
+        return pg_table
 
     def request_size(self):
         """ get number of tiles in request
@@ -895,143 +887,108 @@ class ClusterService(object):
         return np.prod(test).astype(bool)
 
 
-def to_list(option, opt_str, value, parser):
-    setattr(parser.values, option.dest, eval(value))
-
 #
 # Main
 #
 def main():
-    # parsers
-    usage = "usage: %prog [options] arg"
-    parser = OptionParser(usage=usage, description='GLAD Cluster Service: Meanshift clustering for GLAD alerts.')
+    ## Service parsers
 
+    service_parser = ArgumentParser(add_help=False)
 
+    # coordinate group (mutual)
+    # TODO write custom action to reformat values
+    # https://docs.python.org/2/library/argparse.html#action
+    
+    coord_group_m = service_parser.add_mutually_exclusive_group(required=True)
+    coord_group_m.add_argument("--lonlat", dest="latlon", nargs=2, type=float,
+                               metavar=("LON", "LAT"),
+                               help="Longitude and latitude, use to run a single tile")
+    coord_group_m.add_argument("--bounds", dest="bounds", type=str,
+                               metavar=[["minLON", "minLAT"], ["maxLON", "maxLAT"]],
+                               help="bounding box in lat/lon")
+    coord_group_m.add_argument("--xy", dest="xy", nargs=2, type=int,
+                               metavar=("X", "Y"),
+                               help="x/y tile index (z is always set to 12), use  to run a single tile")
+    coord_group_m.add_argument("--tile_bounds", dest="bounds", type=str,
+                               metavar=[["minX", "minY"], ["maxX", "maxY"]],
+                               help="bounding box for x/y tiles")
 
-    ####
-    cluster_group = OptionGroup(parser, "Cluster settings",
+    # Cluster group
+    cluster_group = service_parser.add_argument_group("Cluster settings",
                              "Configure the cluster.")
 
-    cluster_group.add_option("-w", "--width", dest="width",
-                      help="gaussian width in cluster algorithm", default=5)
+    cluster_group.add_argument("-w", "--width", dest="width",
+                      help="gaussian width in cluster algorithm", type=int, default=5)
 
-    cluster_group.add_option("-c", "--min_count", dest="min_count",
-                      help="minimum number of alerts in a cluster", default=25)
-
-    cluster_group.add_option("-i", "--iterations", dest="iterations",
-                      help="number of times to iterate when finding clusters", default=25)
-
-    parser.add_option_group(cluster_group)
-
-
-    ####
-    coord_group = OptionGroup(parser, "Coordinate schema",
-                              "Use either lat/lon or bounds when working with coordinate schema.")
-
-    coord_group.add_option("--lat", dest="lat",
-                           help="latitude, use together with longitude to run a single tile")
-
-    coord_group.add_option("--lon", dest="lon",
-                           help="longitude, use together with latitude to run a single tile")
-
-    coord_group.add_option("-b", "--bounds",  dest="bounds", # action="callback", callback=to_list,
-                           help="bounding box in lat/lon")
-
-    parser.add_option_group(coord_group)
-
-    ####
-    tile_group = OptionGroup(parser, "Tile schema",
-                             "Use either x/y/z or tile bounds when working with tile schema.")
-
-    tile_group.add_option("-x", dest="x",
-                          help="x tile index, use together with y to run a single tile")
-    tile_group.add_option("-y", dest="y",
-                          help="y tile index, use together with x to run a single tile")
-    tile_group.add_option("-z", dest="z",
-                      help="z tile index (optional)", default=12)
-    tile_group.add_option("-t", "--tile_bounds", dest="bounds", nargs="*",
-                      help="bounding box in x/y")
-
-    parser.add_option_group(tile_group)
-
-    ###
-    date_group = OptionGroup(parser, "Dates",
+    cluster_group.add_argument("-c", "--min_count", dest="min_count",
+                      help="minimum number of alerts in a cluster", type=int, default=25)
+    cluster_group.add_argument("-i", "--iterations", dest="iterations",
+                      help="number of times to iterate when finding clusters", type=int, default=25)
+    date_group = service_parser.add_argument_group("Dates",
                               "Set start and end date.")
+    date_group.add_argument("--start_date", dest="start_date", type=str,
+                          metavar="YYYY-MM-DD", help="start date")
+    date_group.add_argument("--end_date", dest="end_date", type=str,
+                          metavar="YYYY-MM-DD", help="end date (optional), default today")
 
-    date_group.add_option("-s", "--start_date", dest="start_date",
-                          metavar="yyyy-mm-dd", help="start date")
+    ## Save parser
+    save_parser = ArgumentParser(add_help=False)
 
-    date_group.add_option("-e", "--end_date", dest="end_date",
-                          metavar="yyyy-mm-dd", help="end date (optional), default today")
-
-    parser.add_option_group(date_group)
-
-    ###
-    save_group = OptionGroup(parser, "Save settings",
+    # Save group
+    save_group = save_parser.add_argument_group("Save settings",
                                 "Save data.")
-
-    save_group.add_option("--save", dest="save",
-                          help="save", action="store_true")
-
-    save_group.add_option("-f", "--file", dest="filename",
+    save_group.add_argument("-f", "--file", dest="filename", type=str,
                             help="CSV filename")
-
-    save_group.add_option("-d", "--destination", dest="destination",
+    save_group.add_argument("-d", "--destination", dest="destination", type=str,
                           help="File destination (local or S3)", default="S3")
-
-    save_group.add_option("--bucket", dest="bucket",
+    save_group.add_argument("--bucket", dest="bucket", type=str,
                             help="S3 bucket in which CSV file will be saved (optional)")
 
-    parser.add_option_group(save_group)
+    ## Export parser
+    export_parser = ArgumentParser(add_help=False)
 
-    export_group = OptionGroup(parser, "Export settings",
-                             "Configure data export.")
+    # Export group
+    export_group = export_parser.add_argument_group("Export settings",
+                                                "Export data.")
+    export_group.add_argument("--format", dest="format", choices=["PG"],
+                               help="export format", default="PG")
+    export_group.add_argument("--pg_table", dest="pg_table", type=str,
+                               help="pg_table")
+    export_group.add_argument("--pg_dbname", dest="pg_dbname", type=str,
+                               required=True, help="pg_dbname")
+    export_group.add_argument("--pg_host", dest="pg_host", type=str,
+                               help="pg_host")
+    export_group.add_argument("--pg_port", dest="pg_port", type=str,
+                               help="pg_port")
+    export_group.add_argument("--pg_user", dest="pg_user", type=str,
+                              required=True, help="pg_user")
+    export_group.add_argument("--pg_password", dest="pg_password", type=str,
+                              required=True, help="pg_password")
 
-    export_group.add_option("--export", dest="export",
-                            help="export", action="store_true")
+    # Main parser
+    parser = ArgumentParser()
+    subparsers = parser.add_subparsers(help='sub-command help')
 
-    export_group.add_option("--format", dest="format",
-                            help="export format")
+    # Subparser INFO
+    parser_info = subparsers.add_parser('info', parents=[service_parser], help='Print cluster service info')
+    parser_info.set_defaults(func=_print_info)
 
-    export_group.add_option("--pg_table", dest="pg_table",
-                            help="pg_table")
+    # Subparser RUN
+    parser_run = subparsers.add_parser('run', parents=[service_parser, save_parser], help='Run cluster service and save to CSV')
+    parser_run.set_defaults(func=_run)
 
-    export_group.add_option("--pg_dbname", dest="pg_dbname",
-                            help="pg_dbname")
+    # Subparser EXPORT
+    parser_export = subparsers.add_parser('export', parents=[service_parser, export_parser], help='Run cluster service and export results to selected format')
+    parser_export.set_defaults(func=_export)
 
-    export_group.add_option("--pg_host", dest="pg_host",
-                            help="pg_host")
-
-    export_group.add_option("--pg_port", dest="pg_port",
-                            help="pg_port")
-
-    export_group.add_option("--pg_user", dest="pg_user",
-                            help="pg_user")
-
-    export_group.add_option("--pg_password", dest="pg_password",
-                            help="pg_password")
+    args = parser.parse_args()
+    args.func(args)
 
 
-    parser.add_option_group(export_group)
-    (options, args) = parser.parse_args()
+def _run(args):
+    service = _run_service(args)
+    _save_service(service)
 
-    opts = vars(options)
-    options = json.dumps({k: opts[k] for k in opts if opts[k] != None})
-
-    #if len(args) != 1:
-    #    parser.error("Incorrect number of arguments.")
-
-    print(args)
-    print(options)
-
-"""
-    if args[0] == 'run':
-        _run_service(options)
-    elif args[0] == 'info':
-        _print_info(options)
-    else:
-        parser.error("{} is not a valid run-type. valid types: [info, run]".format(args[0]))
-"""
 
 def _run_service(args):
     service=_print_info(args,True)
@@ -1043,14 +1000,38 @@ def _run_service(args):
     print("\tTOTAL COUNT: {}".format(count))
     print("\tTOTAL AREA: {}".format(area))
     print("\tDATES: {} to {}".format(min_date,max_date))
+    return service
+
+
+def _save_service(service):
     print("SAVE: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     service.save()
     print("\tfilename: {}".format(service.name()))
     print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
+def _export(args):
+    arg_spec = inspect.getargspec(ClusterService.export)
+    kwargs = vars(args)
+    for key in kwargs.keys():
+        if key not in arg_spec:
+            kwargs.pop(key)
+
+    service = _run_service(args)
+
+    print("EXPORT: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    pg_table = service.export(**kwargs)
+    print("\tfilename: {}".format(pg_table))
+    print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
 
 def _print_info(args,return_service=False):
-    kwargs=json.loads(args.data)
+
+    arg_spec = inspect.getargspec(ClusterService.__init__)
+
+    kwargs = vars(args)
+    for key in kwargs.keys():
+        if key not in arg_spec:
+            kwargs.pop(key)
     service=ClusterService(**kwargs)
     print("\n\nClusterService:")
     print("\trequest_size:",service.request_size())
