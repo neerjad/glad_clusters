@@ -81,9 +81,10 @@ view.clusters(start=182,end=185)
 When you use pip to install the cluster service a CLI is installed along with it. There are two optional "run_types": `info` which just returns data about a potential run, and `run` which runs the service and saves the data.
 
 #### EXAMPLE
+
+Info mode
 ```bash
 $ glad_clusters info -x 1365 -y 2082
-
 
 ClusterService:
     request_size: 1
@@ -92,10 +93,12 @@ ClusterService:
     width: 5
     min_count: 25
     iterations: 25
+```
 
+Run mode
 
+```bash
 $ glad_clusters run -x 1365 -y 2082
-
 
 ClusterService:
     request_size: 1
@@ -115,9 +118,12 @@ SAVE: 2018-02-09 13:13:14
     filename: clusters_2015-01-01%2018-02-09_1365%2082%1365%2082_12%5%25%25
 COMPLETE: 2018-02-09 13:13:15
 
+```
+Export mode
+
+```bash
 
 $ glad_clusters export -x 1365 -y 2082 --pg_dbname scratch --pg_user postgres --pg_password secret
-
 
 ClusterService:
     request_size: 1
@@ -141,8 +147,11 @@ COMPLETE: 2018-02-09 13:13:15
 
 
 #### HELP DOCS
+
+General help
 ```bash
 $ glad_clusters --help
+
 usage: glad_clusters {info,run,export} ...
 
 positional arguments:
@@ -154,8 +163,12 @@ positional arguments:
 optional arguments:
   -h, --help         show this help message and exit
 ```
-  
+
+Info mode 
+
 ```bash
+$ glad_clusters info --help
+
 usage: glad_cluster info [-h]
                        (--lonlat LON LAT | --bounds [['minLON', 'minLAT'], ['maxLON', 'maxLAT']] | --xy X Y | --tile_bounds [['minX', 'minY'], ['maxX', 'maxY']])
                        [-w WIDTH] [-c MIN_COUNT] [-i ITERATIONS]
@@ -190,8 +203,11 @@ Dates:
                         End date (optional), default today
 
 ```
+Run mode
 
 ```bash
+$ glad_clusters run --help
+
 usage: glad_clusters run [-h]
                       (--lonlat LON LAT | --bounds [['minLON', 'minLAT'], ['maxLON', 'maxLAT']] | --xy X Y | --tile_bounds [['minX', 'minY'], ['maxX', 'maxY']])
                       [-w WIDTH] [-c MIN_COUNT] [-i ITERATIONS]
@@ -236,8 +252,11 @@ Save settings:
   --bucket BUCKET       S3 bucket in which CSV file will be saved (optional)
   --temp_dir TEMP_DIR   Temp directory
 ```
+Export mode
 
 ```bash
+$ glad_clusters export --help
+
 usage: glad_clusters export [-h]
                          (--lonlat LON LAT | --bounds [['minLON', 'minLAT'], ['maxLON', 'maxLAT']] | --xy X Y | --tile_bounds [['minX', 'minY'], ['maxX', 'maxY']])
                          [-w WIDTH] [-c MIN_COUNT] [-i ITERATIONS]
