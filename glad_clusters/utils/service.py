@@ -364,8 +364,8 @@ class ClusterService(object):
                     errors<bool[True]>: if true save errors-csv
         """
         if not filename: filename=self.name(ident)
-        if temp_dir:
-            filename = os.path.join(temp_dir,filename)
+        if temp_dir and local:
+            filename = os.path.join(temp_dir, filename)
         if self._dataframe is None: self._process_responses()
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         if local:
