@@ -12,10 +12,9 @@ import glad_clusters.utils.multiprocess as mp
 import psycopg2
 from glad_clusters.clusters.convex_hull import ConvexHull
 import inspect
+import argparse
 from argparse import ArgumentParser
-
-from optparse import OptionParser
-from optparse import OptionGroup
+import copy
 
 
 CSV_ACL='public-read'
@@ -30,7 +29,7 @@ DEFAULT_ZOOM=12
 DELETE_RESPONSES=True
 DEFAULT_BUCKET='gfw-clusters-test'
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
-DEFAULT_CSV_IDENT='clusters'
+DEFAULT_CSV_IDENT='c'
 CSV_NAME_TMPL="{}_{}:{}_{}:{}:{}:{}_{}:{}:{}:{}"
 CONVERTERS={ "alerts" :lambda r: np.array(json.loads(r)) }
 
@@ -451,14 +450,14 @@ class ClusterService(object):
             try:
                 cur.execute("SELECT * FROM {} LIMIT 1;".format(pg_table))
                 exists = True
-            except Exception, e:
-                if psycopg2.errorcodes.lookup(e.pgcode) == 'UNDEFINED_TABLE':
-                    exists = False
-                else:
-                    exists = True  # probably redundant...
+            except:
+                conn.commit()
+                exists = False
 
             if overwrite and exists:
+
                 cur.execute("DELETE FROM {};".format(pg_table))
+                conn.commit()
 
             elif not exists:
                 sql = """
@@ -484,9 +483,9 @@ class ClusterService(object):
                     WITH (
                       OIDS=FALSE
                     );
-
-                    select AddGeometryColumn('{0}', 'multipoint', 4326, 'MULTIPOINT', 3);
-                    select AddGeometryColumn('{0}', 'concave', 4326, 'POLYGON', 2);
+                    
+                    SELECT AddGeometryColumn('{0}', 'multipoint', 4326, 'MULTIPOINT', 3);
+                    SELECT AddGeometryColumn('{0}', 'concave', 4326, 'POLYGON', 2);
 
                     CREATE INDEX {0}_index_idx
                       ON {0}
@@ -498,13 +497,15 @@ class ClusterService(object):
                       USING gist
                       (multipoint);
 
-
                     CREATE INDEX {0}_concave_idx
                       ON {0}
                       USING gist
-                      (concave);""".format(pg_table)
-
-                cur.execute(sql)
+                      (concave);
+                    """.format(pg_table)
+                try:
+                    cur.execute(sql)
+                except Exception, e:
+                    print(e.pgerror)
 
             else:
                 raise Exception('PG table already exist and overwrite set to false.')
@@ -563,7 +564,7 @@ class ClusterService(object):
 
             self._dataframe['alerts'] = self._dataframe['alerts'].apply(lambda a: np.array(a))
 
-            print("Data successfully exported to table {}".format(pg_table))
+            # print("Data successfully exported to table {}".format(pg_table))
 
         else:
             raise Exception('Unsupported format.')
@@ -623,6 +624,7 @@ class ClusterService(object):
         if dataframe is None: dataframe=self.dataframe()
         count=dataframe['count'].sum()
         area=dataframe.area.sum()
+        # TODO does not return dates but NaN
         min_date,max_date=ClusterService.int_to_str_dates(
                 dataframe.min_date.min(),
                 dataframe.max_date.max())
@@ -668,7 +670,7 @@ class ClusterService(object):
         """ fetch data for single cluster
 
             Method for selecting row of dataframe
-            
+
             Args:
 
                 Use one of the following to select the row:
@@ -682,10 +684,10 @@ class ClusterService(object):
 
                 Other arguments:
 
-                    ascending<bool>: 
+                    ascending<bool>:
                         if true sort by ascending time and grab first matching row
                     full:
-                        if false return only VIEW_COLUMNS. 
+                        if false return only VIEW_COLUMNS.
                         else include all columns (including input/alerts data)
         """
         if self._not_none([row_id]):
@@ -694,12 +696,12 @@ class ClusterService(object):
             test=True
             if self._not_none([lon,lat]):
                 test=test & (
-                    (self.dataframe(full=True).latitude==lat) & 
+                    (self.dataframe(full=True).latitude==lat) &
                     (self.dataframe(full=True).longitude==lon))
             elif self._not_none([x,y,z]):
                 test=test & (
-                    (self.dataframe(full=True).z==z) & 
-                    (self.dataframe(full=True).x==x) & 
+                    (self.dataframe(full=True).z==z) &
+                    (self.dataframe(full=True).x==x) &
                     (self.dataframe(full=True).y==y))
             if timestamp:
                 test=test & (self.dataframe(full=True).timestamp==timestamp)
@@ -714,10 +716,10 @@ class ClusterService(object):
 
     def convex_hull(self,row_id=None,alerts=None):
         """ get convex_hull vertices for cluster
-            
+
             Args:
                 row_id<int>: if not alerts, dataframe row index for cluster
-                alerts<array>: alerts for cluster 
+                alerts<array>: alerts for cluster
         """
         if alerts is None:
             alerts=self.dataframe(full=True).iloc[row_id].alerts
@@ -749,7 +751,7 @@ class ClusterService(object):
         else:
             return json.dumps(data)
 
-    
+
     def _set_tile_bounds(self,bounds,tile_bounds,lon,lat,x,y):
         """
             NOTE: if a single pair (x,y) or (lon,lat) the x,y-values 
@@ -887,35 +889,57 @@ class ClusterService(object):
         return np.prod(test).astype(bool)
 
 
+class ToListAction(argparse.Action):
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        super(ToListAction, self).__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values:
+            setattr(namespace, self.dest, json.loads(values))
+
+
+class ToLatLon(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, "lon", values[0])
+        setattr(namespace, "lat", values[1])
+
+
+class ToXY(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, "x", values[0])
+        setattr(namespace, "y", values[1])
 #
 # Main
 #
+
+
 def main():
     ## Service parsers
 
     service_parser = ArgumentParser(add_help=False)
 
     # coordinate group (mutual)
-    # TODO write custom action to reformat values
-    # https://docs.python.org/2/library/argparse.html#action
-    
+
     coord_group_m = service_parser.add_mutually_exclusive_group(required=True)
-    coord_group_m.add_argument("--lonlat", dest="latlon", nargs=2, type=float,
+    coord_group_m.add_argument("--lonlat", nargs=2, type=float, action=ToLatLon,
                                metavar=("LON", "LAT"),
                                help="Longitude and latitude, use to run a single tile")
-    coord_group_m.add_argument("--bounds", dest="bounds", type=str,
+    coord_group_m.add_argument("--bounds", type=str, action=ToListAction,
                                metavar=[["minLON", "minLAT"], ["maxLON", "maxLAT"]],
                                help="bounding box in lat/lon")
-    coord_group_m.add_argument("--xy", dest="xy", nargs=2, type=int,
+    coord_group_m.add_argument("--xy", nargs=2, type=int, #action=ToXY,
                                metavar=("X", "Y"),
                                help="x/y tile index (z is always set to 12), use  to run a single tile")
-    coord_group_m.add_argument("--tile_bounds", dest="bounds", type=str,
+    coord_group_m.add_argument("--tile_bounds", type=str, action=ToListAction,
                                metavar=[["minX", "minY"], ["maxX", "maxY"]],
                                help="bounding box for x/y tiles")
 
     # Cluster group
-    cluster_group = service_parser.add_argument_group("Cluster settings",
-                             "Configure the cluster.")
+    cluster_group = service_parser.add_argument_group("Cluster settings", "Configure the cluster.")
 
     cluster_group.add_argument("-w", "--width", dest="width",
                       help="gaussian width in cluster algorithm", type=int, default=5)
@@ -948,8 +972,7 @@ def main():
     export_parser = ArgumentParser(add_help=False)
 
     # Export group
-    export_group = export_parser.add_argument_group("Export settings",
-                                                "Export data.")
+    export_group = export_parser.add_argument_group("Export settings", "Export data.")
     export_group.add_argument("--format", dest="format", choices=["PG"],
                                help="export format", default="PG")
     export_group.add_argument("--pg_table", dest="pg_table", type=str,
@@ -964,6 +987,10 @@ def main():
                               required=True, help="pg_user")
     export_group.add_argument("--pg_password", dest="pg_password", type=str,
                               required=True, help="pg_password")
+    export_group.add_argument("--temp_dir", dest="temp_dir", type=str,
+                              required=True, help="temp dir")
+    export_group.add_argument("--overwrite", dest="overwrite", action='store_true',
+                              help="temp dir")
 
     # Main parser
     parser = ArgumentParser()
@@ -1009,18 +1036,23 @@ def _save_service(service):
     print("\tfilename: {}".format(service.name()))
     print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
+
 def _export(args):
+
+    kwargs = copy.deepcopy(vars(args))
     arg_spec = inspect.getargspec(ClusterService.export)
-    kwargs = vars(args)
-    for key in kwargs.keys():
-        if key not in arg_spec:
-            kwargs.pop(key)
 
     service = _run_service(args)
 
+    for key in kwargs.keys():
+        if key not in arg_spec[0]:
+            kwargs.pop(key)
+        elif not kwargs[key] or (isinstance(kwargs[key], dict) and len(arg_spec[key] == 0)):
+            kwargs.pop(key)
+
     print("EXPORT: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
     pg_table = service.export(**kwargs)
-    print("\tfilename: {}".format(pg_table))
+    print("\tpg_table: {}".format(pg_table))
     print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
 
@@ -1029,10 +1061,15 @@ def _print_info(args,return_service=False):
     arg_spec = inspect.getargspec(ClusterService.__init__)
 
     kwargs = vars(args)
+
     for key in kwargs.keys():
-        if key not in arg_spec:
+        if key not in arg_spec[0]:
             kwargs.pop(key)
-    service=ClusterService(**kwargs)
+        elif not kwargs[key] or (isinstance(kwargs[key], dict) and len(kwargs[key] == 0)):
+            kwargs.pop(key)
+
+    service = ClusterService(**kwargs)
+
     print("\n\nClusterService:")
     print("\trequest_size:",service.request_size())
     print("\tbounds:",service.bounds())
