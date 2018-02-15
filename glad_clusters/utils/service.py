@@ -30,7 +30,7 @@ DELETE_RESPONSES=True
 DEFAULT_BUCKET='gfw-clusters-test'
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
 DEFAULT_CSV_IDENT='clusters'
-CSV_NAME_TMPL="{}_{}:{}_{}:{}:{}:{}_{}:{}:{}:{}"
+CSV_NAME_TMPL="{}_{}%{}_{}%{}%{}%{}_{}%{}%{}%{}"
 CONVERTERS={ "alerts" :lambda r: np.array(json.loads(r)) }
 
 
@@ -429,7 +429,7 @@ class ClusterService(object):
         if format == "PG":
 
             if not pg_table:
-                pg_table = self.name(ident).replace(":", "").replace("-", "") + "_" + str(concave)
+                pg_table = self.name(ident).replace("%", "").replace(":", "").replace("-", "") + "_" + str(concave)
 
             # TODO add temp_dir to local_env
             filename = os.path.join(temp_dir, pg_table + ".csv")
