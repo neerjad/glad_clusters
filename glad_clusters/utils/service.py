@@ -29,7 +29,7 @@ DEFAULT_ZOOM=12
 DELETE_RESPONSES=True
 DEFAULT_BUCKET='gfw-clusters-test'
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
-DEFAULT_CSV_IDENT='c'
+DEFAULT_CSV_IDENT='clusters'
 CSV_NAME_TMPL="{}_{}:{}_{}:{}:{}:{}_{}:{}:{}:{}"
 CONVERTERS={ "alerts" :lambda r: np.array(json.loads(r)) }
 
@@ -65,7 +65,7 @@ ERROR_COLUMNS=[
     'error',
     'error_trace']
 
-BOTO3_CONFIG={ 
+BOTO3_CONFIG={
     'read_timeout': 600,
     'region_name': 'us-east-1'
 }
@@ -127,13 +127,13 @@ class ClusterService(object):
         else:
             dfpath,edfpath=ClusterService.get_urls(filename,region,bucket,url_base,errors)
         df=pd.read_csv(dfpath,converters=CONVERTERS)
-        if errors: 
+        if errors:
             try:
                 edf=pd.read_csv(edfpath)
             except:
                 edf=None
         else: edf=None
-        return df, edf 
+        return df, edf
 
 
 
@@ -155,11 +155,11 @@ class ClusterService(object):
         if not url_base: url_base=S3_URL_TMPL.format(region)
         url_base="{}/{}".format(url_base,bucket)
         dfpath='{}/{}.csv'.format(url_base,filename)
-        if errors: 
+        if errors:
             edfpath='{}/{}.errors.csv'.format(url_base,filename)
             return dfpath, edfpath
         else:
-            return dfpath     
+            return dfpath
 
 
     @staticmethod
@@ -232,7 +232,7 @@ class ClusterService(object):
     @staticmethod
     def lon(z,x,y,i=0,j=0):
         """ longitude from z/x/y/i/j
-        """        
+        """
         lon=(360.0/(2**z))*(x+(i/256.0))-180.0
         return lon
 
@@ -346,7 +346,8 @@ class ClusterService(object):
             filename=None,
             local=False,
             bucket=None,
-            errors=True):
+            errors=True,
+            temp_dir=None):
         """ write responses to csv
 
             Args:
@@ -363,7 +364,9 @@ class ClusterService(object):
                     errors<bool[True]>: if true save errors-csv
         """
         if not filename: filename=self.name(ident)
-        if  self._dataframe is None: self._process_responses()
+        if temp_dir:
+            filename = os.path.join(temp_dir,filename)
+        if self._dataframe is None: self._process_responses()
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         if local:
             self.dataframe(full=True).to_csv(
@@ -397,6 +400,7 @@ class ClusterService(object):
                pg_port=5432,
                pg_user=None,
                pg_password=None,
+               concave=99,
                overwrite=False
                ):
         """ write responses to csv
@@ -425,7 +429,7 @@ class ClusterService(object):
         if format == "PG":
 
             if not pg_table:
-                pg_table = self.name(ident).replace(":", "").replace("-", "")
+                pg_table = self.name(ident).replace(":", "").replace("-", "") + "_" + str(concave)
 
             # TODO add temp_dir to local_env
             filename = os.path.join(temp_dir, pg_table + ".csv")
@@ -451,13 +455,11 @@ class ClusterService(object):
                 cur.execute("SELECT * FROM {} LIMIT 1;".format(pg_table))
                 exists = True
             except:
+                # make a commit here to avoid internal errors down the line
                 conn.commit()
-                exists = False
 
             if overwrite and exists:
-
                 cur.execute("DELETE FROM {};".format(pg_table))
-                conn.commit()
 
             elif not exists:
                 sql = """
@@ -502,10 +504,8 @@ class ClusterService(object):
                       USING gist
                       (concave);
                     """.format(pg_table)
-                try:
-                    cur.execute(sql)
-                except Exception, e:
-                    print(e.pgerror)
+
+                cur.execute(sql)
 
             else:
                 raise Exception('PG table already exist and overwrite set to false.')
@@ -554,13 +554,17 @@ class ClusterService(object):
                     WHERE "index" = id;
 
                     UPDATE {0}
-                    SET concave = ST_ConcaveHull (multipoint, 0.99);
-                """.format(pg_table, filename)
+                    SET concave = ST_ConcaveHull (multipoint, {2});
+                """.format(pg_table, filename, concave/100)
 
+            # execute SQL and close connection
             cur.execute(sql)
             conn.commit()
             cur.close()
             conn.close()
+
+            # delete temp file
+            os.remove(filename)
 
             self._dataframe['alerts'] = self._dataframe['alerts'].apply(lambda a: np.array(a))
 
@@ -769,8 +773,8 @@ class ClusterService(object):
         tile_bounds=np.array(tile_bounds).astype(int)
         self.x_min,self.y_min=tile_bounds.min(axis=0)
         self.x_max,self.y_max=tile_bounds.max(axis=0)
-            
-            
+
+
     def _lonlat_to_xy(self,lon,lat):
         lat_rad=math.radians(lat)
         x=(2**self.z)*(lon+180.0)/360
@@ -822,10 +826,10 @@ class ClusterService(object):
     def _process_responses(self):
         rows,error_rows=self._dataframes_rows()
         self._dataframe=pd.DataFrame(
-            rows, 
+            rows,
             columns=DATAFRAME_COLUMNS)
         self._error_dataframe=pd.DataFrame(
-            error_rows, 
+            error_rows,
             columns=ERROR_COLUMNS)
         self._dataframe.sort_values(
             'timestamp',
@@ -912,6 +916,7 @@ class ToXY(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, "x", values[0])
         setattr(namespace, "y", values[1])
+
 #
 # Main
 #
@@ -930,43 +935,47 @@ def main():
                                help="Longitude and latitude, use to run a single tile")
     coord_group_m.add_argument("--bounds", type=str, action=ToListAction,
                                metavar=[["minLON", "minLAT"], ["maxLON", "maxLAT"]],
-                               help="bounding box in lat/lon")
+                               help="Bounding box in lat/lon")
     coord_group_m.add_argument("--xy", nargs=2, type=int, #action=ToXY,
                                metavar=("X", "Y"),
-                               help="x/y tile index (z is always set to 12), use  to run a single tile")
+                               help="X/Y tile index (z is always set to 12), use  to run a single tile")
     coord_group_m.add_argument("--tile_bounds", type=str, action=ToListAction,
                                metavar=[["minX", "minY"], ["maxX", "maxY"]],
-                               help="bounding box for x/y tiles")
+                               help="Bounding box for x/y tiles")
 
     # Cluster group
     cluster_group = service_parser.add_argument_group("Cluster settings", "Configure the cluster.")
 
     cluster_group.add_argument("-w", "--width", dest="width",
-                      help="gaussian width in cluster algorithm", type=int, default=5)
+                               help="Gaussian width in cluster algorithm", type=int, default=5)
 
     cluster_group.add_argument("-c", "--min_count", dest="min_count",
-                      help="minimum number of alerts in a cluster", type=int, default=25)
+                               help="Minimum number of alerts in a cluster", type=int, default=25)
     cluster_group.add_argument("-i", "--iterations", dest="iterations",
-                      help="number of times to iterate when finding clusters", type=int, default=25)
-    date_group = service_parser.add_argument_group("Dates",
-                              "Set start and end date.")
+                               help="Number of times to iterate when finding clusters", type=int, default=25)
+
+    # Date group
+    date_group = service_parser.add_argument_group("Dates", "Set start and end date.")
+
     date_group.add_argument("--start_date", dest="start_date", type=str,
-                          metavar="YYYY-MM-DD", help="start date")
+                            metavar="YYYY-MM-DD", help="Start date")
     date_group.add_argument("--end_date", dest="end_date", type=str,
-                          metavar="YYYY-MM-DD", help="end date (optional), default today")
+                            metavar="YYYY-MM-DD", help="End date (optional), default today")
 
     ## Save parser
     save_parser = ArgumentParser(add_help=False)
 
     # Save group
-    save_group = save_parser.add_argument_group("Save settings",
-                                "Save data.")
+    save_group = save_parser.add_argument_group("Save settings","Save data.")
+
     save_group.add_argument("-f", "--file", dest="filename", type=str,
                             help="CSV filename")
-    save_group.add_argument("-d", "--destination", dest="destination", type=str,
-                          help="File destination (local or S3)", default="S3")
+    save_group.add_argument("--local", dest="local", action="store_true",
+                            help="If set, save file locally")
     save_group.add_argument("--bucket", dest="bucket", type=str,
                             help="S3 bucket in which CSV file will be saved (optional)")
+    save_group.add_argument("--temp_dir", dest="temp_dir", type=str,
+                            help="Temp directory")
 
     ## Export parser
     export_parser = ArgumentParser(add_help=False)
@@ -974,23 +983,26 @@ def main():
     # Export group
     export_group = export_parser.add_argument_group("Export settings", "Export data.")
     export_group.add_argument("--format", dest="format", choices=["PG"],
-                               help="export format", default="PG")
+                               help="Export format (default PG)", default="PG")
     export_group.add_argument("--pg_table", dest="pg_table", type=str,
-                               help="pg_table")
+                               help="PostgreSQL table name")
     export_group.add_argument("--pg_dbname", dest="pg_dbname", type=str,
-                               required=True, help="pg_dbname")
+                               required=True, help="PostgreSQL database name")
     export_group.add_argument("--pg_host", dest="pg_host", type=str,
-                               help="pg_host")
+                               help="PostgreSQL host")
     export_group.add_argument("--pg_port", dest="pg_port", type=str,
-                               help="pg_port")
+                               help="PostgreSQL port")
     export_group.add_argument("--pg_user", dest="pg_user", type=str,
-                              required=True, help="pg_user")
+                              required=True, help="PostgreSQL user")
     export_group.add_argument("--pg_password", dest="pg_password", type=str,
-                              required=True, help="pg_password")
+                              required=True, help="PostgreSQL password")
+    export_group.add_argument("--concave", dest="concave", type=int,
+                              help="Target percent of area for concave hull. Integers between 0 and 100."\
+                                    "When set to 100, area is equal to convex hull")
     export_group.add_argument("--temp_dir", dest="temp_dir", type=str,
-                              required=True, help="temp dir")
+                              required=True, help="Temp directory")
     export_group.add_argument("--overwrite", dest="overwrite", action='store_true',
-                              help="temp dir")
+                              help="Overwrite existing table")
 
     # Main parser
     parser = ArgumentParser()
@@ -1014,7 +1026,7 @@ def main():
 
 def _run(args):
     service = _run_service(args)
-    _save_service(service)
+    _save_service(service, args)
 
 
 def _run_service(args):
@@ -1030,9 +1042,21 @@ def _run_service(args):
     return service
 
 
-def _save_service(service):
+def _save_service(service, args):
+
+    kwargs = copy.deepcopy(vars(args))
+    arg_spec = inspect.getargspec(ClusterService.save)
+
+    service = _run_service(args)
+
+    for key in kwargs.keys():
+        if key not in arg_spec[0]:
+            kwargs.pop(key)
+        elif not kwargs[key] or (isinstance(kwargs[key], dict) and len(arg_spec[key] == 0)):
+            kwargs.pop(key)
+
     print("SAVE: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    service.save()
+    service.save(**kwargs)
     print("\tfilename: {}".format(service.name()))
     print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
@@ -1060,7 +1084,7 @@ def _print_info(args,return_service=False):
 
     arg_spec = inspect.getargspec(ClusterService.__init__)
 
-    kwargs = vars(args)
+    kwargs = copy.deepcopy(vars(args))
 
     for key in kwargs.keys():
         if key not in arg_spec[0]:
@@ -1083,7 +1107,7 @@ def _print_info(args,return_service=False):
         print("\n")
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     main()
 
 
