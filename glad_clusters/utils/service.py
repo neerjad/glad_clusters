@@ -400,7 +400,7 @@ class ClusterService(object):
                pg_port=5432,
                pg_user=None,
                pg_password=None,
-               concave=99,
+               concave=100,
                overwrite=False
                ):
         """ write responses to csv
