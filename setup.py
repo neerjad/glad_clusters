@@ -11,6 +11,7 @@ setup(
   download_url = 'https://github.com/wri/mean_shift_lambda/tarball/0.1',
   keywords = ['Clustering','MeanShift', 'AWS','Lambda','GLAD'],
   include_package_data=True,
+  install_requires=['boto3', 'numpy', 'pandas', 'psycopg2', 'scikit-image', 'pyyaml'],
   data_files=[
     (
       'config',[]

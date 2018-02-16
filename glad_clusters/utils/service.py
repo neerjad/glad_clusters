@@ -1,6 +1,5 @@
 from __future__ import print_function
 import os
-import argparse
 from datetime import datetime
 import math
 import itertools
@@ -12,6 +11,10 @@ import pandas as pd
 import glad_clusters.utils.multiprocess as mp
 import psycopg2
 from glad_clusters.clusters.convex_hull import ConvexHull
+import inspect
+import argparse
+from argparse import ArgumentParser
+import copy
 
 
 CSV_ACL='public-read'
@@ -27,7 +30,7 @@ DELETE_RESPONSES=True
 DEFAULT_BUCKET='gfw-clusters-test'
 LAMBDA_FUNCTION_NAME='gfw-glad-clusters-v1-dev-meanshift'
 DEFAULT_CSV_IDENT='clusters'
-CSV_NAME_TMPL="{}_{}:{}_{}:{}:{}:{}_{}:{}:{}:{}"
+CSV_NAME_TMPL="{}_{}%{}_{}%{}%{}%{}_{}%{}%{}%{}"
 CONVERTERS={ "alerts" :lambda r: np.array(json.loads(r)) }
 
 
@@ -62,7 +65,7 @@ ERROR_COLUMNS=[
     'error',
     'error_trace']
 
-BOTO3_CONFIG={ 
+BOTO3_CONFIG={
     'read_timeout': 600,
     'region_name': 'us-east-1'
 }
@@ -124,13 +127,13 @@ class ClusterService(object):
         else:
             dfpath,edfpath=ClusterService.get_urls(filename,region,bucket,url_base,errors)
         df=pd.read_csv(dfpath,converters=CONVERTERS)
-        if errors: 
+        if errors:
             try:
                 edf=pd.read_csv(edfpath)
             except:
                 edf=None
         else: edf=None
-        return df, edf 
+        return df, edf
 
 
 
@@ -152,11 +155,11 @@ class ClusterService(object):
         if not url_base: url_base=S3_URL_TMPL.format(region)
         url_base="{}/{}".format(url_base,bucket)
         dfpath='{}/{}.csv'.format(url_base,filename)
-        if errors: 
+        if errors:
             edfpath='{}/{}.errors.csv'.format(url_base,filename)
             return dfpath, edfpath
         else:
-            return dfpath     
+            return dfpath
 
 
     @staticmethod
@@ -229,7 +232,7 @@ class ClusterService(object):
     @staticmethod
     def lon(z,x,y,i=0,j=0):
         """ longitude from z/x/y/i/j
-        """        
+        """
         lon=(360.0/(2**z))*(x+(i/256.0))-180.0
         return lon
 
@@ -343,7 +346,8 @@ class ClusterService(object):
             filename=None,
             local=False,
             bucket=None,
-            errors=True):
+            errors=True,
+            temp_dir=None):
         """ write responses to csv
 
             Args:
@@ -360,7 +364,9 @@ class ClusterService(object):
                     errors<bool[True]>: if true save errors-csv
         """
         if not filename: filename=self.name(ident)
-        if  self._dataframe is None: self._process_responses()
+        if temp_dir and local:
+            filename = os.path.join(temp_dir, filename)
+        if self._dataframe is None: self._process_responses()
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: a.tolist())
         if local:
             self.dataframe(full=True).to_csv(
@@ -389,7 +395,12 @@ class ClusterService(object):
                format="PG",
                temp_dir=None,
                pg_table=None,
-               pg_conn=None,
+               pg_dbname=None,
+               pg_host="localhost",
+               pg_port=5432,
+               pg_user=None,
+               pg_password=None,
+               concave=100,
                overwrite=False
                ):
         """ write responses to csv
@@ -418,7 +429,7 @@ class ClusterService(object):
         if format == "PG":
 
             if not pg_table:
-                pg_table = self.name(ident).replace(":", "").replace("-", "")
+                pg_table = self.name(ident).replace("%", "").replace(":", "").replace("-", "") + "_" + str(concave)
 
             # TODO add temp_dir to local_env
             filename = os.path.join(temp_dir, pg_table + ".csv")
@@ -433,20 +444,6 @@ class ClusterService(object):
             # if errors and self.errors().shape[0]:
             #     self.errors().to_csv("{}.errors.csv".format(filename), index=None)
 
-            pg_user = pg_conn["user"]
-            pg_password = pg_conn["password"]
-            pg_dbname = pg_conn["dbname"]
-
-            if "host" in pg_conn.keys():
-                pg_host = pg_conn["host"]
-            else:
-                pg_host = "localhost"
-
-            if "port" in pg_conn.keys():
-                pg_port = pg_conn["port"]
-            else:
-                pg_port = "5432"
-
             if not pg_table:
                 pg_table = os.path.basename(filename)
 
@@ -457,11 +454,9 @@ class ClusterService(object):
             try:
                 cur.execute("SELECT * FROM {} LIMIT 1;".format(pg_table))
                 exists = True
-            except Exception, e:
-                if psycopg2.errorcodes.lookup(e.pgcode) == 'UNDEFINED_TABLE':
-                    exists = False
-                else:
-                    exists = True  # probably redundant...
+            except:
+                # make a commit here to avoid internal errors down the line
+                conn.commit()
 
             if overwrite and exists:
                 cur.execute("DELETE FROM {};".format(pg_table))
@@ -490,9 +485,9 @@ class ClusterService(object):
                     WITH (
                       OIDS=FALSE
                     );
-
-                    select AddGeometryColumn('{0}', 'multipoint', 4326, 'MULTIPOINT', 3);
-                    select AddGeometryColumn('{0}', 'concave', 4326, 'POLYGON', 2);
+                    
+                    SELECT AddGeometryColumn('{0}', 'multipoint', 4326, 'MULTIPOINT', 3);
+                    SELECT AddGeometryColumn('{0}', 'concave', 4326, 'POLYGON', 2);
 
                     CREATE INDEX {0}_index_idx
                       ON {0}
@@ -504,11 +499,11 @@ class ClusterService(object):
                       USING gist
                       (multipoint);
 
-
                     CREATE INDEX {0}_concave_idx
                       ON {0}
                       USING gist
-                      (concave);""".format(pg_table)
+                      (concave);
+                    """.format(pg_table)
 
                 cur.execute(sql)
 
@@ -559,22 +554,26 @@ class ClusterService(object):
                     WHERE "index" = id;
 
                     UPDATE {0}
-                    SET concave = ST_ConcaveHull (multipoint, 0.99);
-                """.format(pg_table, filename)
+                    SET concave = ST_ConcaveHull(ST_Force2D(multipoint), {2});
+                """.format(pg_table, filename, concave/100)
 
+            # execute SQL and close connection
             cur.execute(sql)
             conn.commit()
             cur.close()
             conn.close()
 
+            # delete temp file
+            os.remove(filename)
+
             self._dataframe['alerts'] = self._dataframe['alerts'].apply(lambda a: np.array(a))
 
-            print("Data successfully exported to table {}".format(pg_table))
+            # print("Data successfully exported to table {}".format(pg_table))
 
         else:
             raise Exception('Unsupported format.')
 
-        return
+        return pg_table
 
     def request_size(self):
         """ get number of tiles in request
@@ -629,6 +628,7 @@ class ClusterService(object):
         if dataframe is None: dataframe=self.dataframe()
         count=dataframe['count'].sum()
         area=dataframe.area.sum()
+        # TODO does not return dates but NaN
         min_date,max_date=ClusterService.int_to_str_dates(
                 dataframe.min_date.min(),
                 dataframe.max_date.max())
@@ -674,7 +674,7 @@ class ClusterService(object):
         """ fetch data for single cluster
 
             Method for selecting row of dataframe
-            
+
             Args:
 
                 Use one of the following to select the row:
@@ -688,10 +688,10 @@ class ClusterService(object):
 
                 Other arguments:
 
-                    ascending<bool>: 
+                    ascending<bool>:
                         if true sort by ascending time and grab first matching row
                     full:
-                        if false return only VIEW_COLUMNS. 
+                        if false return only VIEW_COLUMNS.
                         else include all columns (including input/alerts data)
         """
         if self._not_none([row_id]):
@@ -700,12 +700,12 @@ class ClusterService(object):
             test=True
             if self._not_none([lon,lat]):
                 test=test & (
-                    (self.dataframe(full=True).latitude==lat) & 
+                    (self.dataframe(full=True).latitude==lat) &
                     (self.dataframe(full=True).longitude==lon))
             elif self._not_none([x,y,z]):
                 test=test & (
-                    (self.dataframe(full=True).z==z) & 
-                    (self.dataframe(full=True).x==x) & 
+                    (self.dataframe(full=True).z==z) &
+                    (self.dataframe(full=True).x==x) &
                     (self.dataframe(full=True).y==y))
             if timestamp:
                 test=test & (self.dataframe(full=True).timestamp==timestamp)
@@ -720,10 +720,10 @@ class ClusterService(object):
 
     def convex_hull(self,row_id=None,alerts=None):
         """ get convex_hull vertices for cluster
-            
+
             Args:
                 row_id<int>: if not alerts, dataframe row index for cluster
-                alerts<array>: alerts for cluster 
+                alerts<array>: alerts for cluster
         """
         if alerts is None:
             alerts=self.dataframe(full=True).iloc[row_id].alerts
@@ -755,7 +755,7 @@ class ClusterService(object):
         else:
             return json.dumps(data)
 
-    
+
     def _set_tile_bounds(self,bounds,tile_bounds,lon,lat,x,y):
         """
             NOTE: if a single pair (x,y) or (lon,lat) the x,y-values 
@@ -773,8 +773,8 @@ class ClusterService(object):
         tile_bounds=np.array(tile_bounds).astype(int)
         self.x_min,self.y_min=tile_bounds.min(axis=0)
         self.x_max,self.y_max=tile_bounds.max(axis=0)
-            
-            
+
+
     def _lonlat_to_xy(self,lon,lat):
         lat_rad=math.radians(lat)
         x=(2**self.z)*(lon+180.0)/360
@@ -826,10 +826,10 @@ class ClusterService(object):
     def _process_responses(self):
         rows,error_rows=self._dataframes_rows()
         self._dataframe=pd.DataFrame(
-            rows, 
+            rows,
             columns=DATAFRAME_COLUMNS)
         self._error_dataframe=pd.DataFrame(
-            error_rows, 
+            error_rows,
             columns=ERROR_COLUMNS)
         self._dataframe.sort_values(
             'timestamp',
@@ -893,30 +893,142 @@ class ClusterService(object):
         return np.prod(test).astype(bool)
 
 
+class ToListAction(argparse.Action):
+    def __init__(self, option_strings, dest, nargs=None, **kwargs):
+        if nargs is not None:
+            raise ValueError("nargs not allowed")
+        super(ToListAction, self).__init__(option_strings, dest, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        if values:
+            setattr(namespace, self.dest, json.loads(values))
+
+
+class ToLatLon(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, "lon", values[0])
+        setattr(namespace, "lat", values[1])
+
+
+class ToXY(argparse.Action):
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        setattr(namespace, "x", values[0])
+        setattr(namespace, "y", values[1])
+
 #
 # Main
 #
+
+
 def main():
-    # parsers
-    parser=argparse.ArgumentParser(description='GLAD Cluster Service: Meanshift clustering for GLAD alerts.')
-    # subparsers
-    parser.add_argument('run_type',
-        help='run-type: one of run, info')
-    parser.add_argument('data',
-        help='json string for any of the keyword arguments in ClusterService()')
-    parser.set_defaults(func=_run)
-    # execute
-    args=parser.parse_args()
+    ## Service parsers
+
+    service_parser = ArgumentParser(add_help=False)
+
+    # coordinate group (mutual)
+
+    coord_group_m = service_parser.add_mutually_exclusive_group(required=True)
+    coord_group_m.add_argument("--lonlat", nargs=2, type=float, action=ToLatLon,
+                               metavar=("LON", "LAT"),
+                               help="Longitude and latitude, use to run a single tile")
+    coord_group_m.add_argument("--bounds", type=str, action=ToListAction,
+                               metavar=[["minLON", "minLAT"], ["maxLON", "maxLAT"]],
+                               help="Bounding box in lat/lon")
+    coord_group_m.add_argument("--xy", nargs=2, type=int, #action=ToXY,
+                               metavar=("X", "Y"),
+                               help="X/Y tile index (z is always set to 12), use  to run a single tile")
+    coord_group_m.add_argument("--tile_bounds", type=str, action=ToListAction,
+                               metavar=[["minX", "minY"], ["maxX", "maxY"]],
+                               help="Bounding box for x/y tiles")
+
+    # Cluster group
+    cluster_group = service_parser.add_argument_group("Cluster settings", "Configure the cluster.")
+
+    cluster_group.add_argument("-w", "--width", dest="width",
+                               help="Gaussian width in cluster algorithm", type=int, default=5)
+
+    cluster_group.add_argument("-c", "--min_count", dest="min_count",
+                               help="Minimum number of alerts in a cluster", type=int, default=25)
+    cluster_group.add_argument("-i", "--iterations", dest="iterations",
+                               help="Number of times to iterate when finding clusters", type=int, default=25)
+
+    # Date group
+    date_group = service_parser.add_argument_group("Dates", "Set start and end date.")
+
+    date_group.add_argument("--start_date", dest="start_date", type=str,
+                            metavar="YYYY-MM-DD", help="Start date")
+    date_group.add_argument("--end_date", dest="end_date", type=str,
+                            metavar="YYYY-MM-DD", help="End date (optional), default today")
+
+    ## Save parser
+    save_parser = ArgumentParser(add_help=False)
+
+    # Save group
+    save_group = save_parser.add_argument_group("Save settings","Save data.")
+
+    save_group.add_argument("-f", "--file", dest="filename", type=str,
+                            help="CSV filename")
+    save_group.add_argument("--local", dest="local", action="store_true",
+                            help="If set, save file locally")
+    save_group.add_argument("--bucket", dest="bucket", type=str,
+                            help="S3 bucket in which CSV file will be saved (optional)")
+    save_group.add_argument("--temp_dir", dest="temp_dir", type=str,
+                            help="Temp directory")
+
+    ## Export parser
+    export_parser = ArgumentParser(add_help=False)
+
+    # Export group
+    export_group = export_parser.add_argument_group("Export settings", "Export data.")
+    export_group.add_argument("--format", dest="format", choices=["PG"],
+                               help="Export format (default PG)", default="PG")
+    export_group.add_argument("--pg_table", dest="pg_table", type=str,
+                               help="PostgreSQL table name")
+    export_group.add_argument("--pg_dbname", dest="pg_dbname", type=str,
+                               required=True, help="PostgreSQL database name")
+    export_group.add_argument("--pg_host", dest="pg_host", type=str,
+                               help="PostgreSQL host")
+    export_group.add_argument("--pg_port", dest="pg_port", type=str,
+                               help="PostgreSQL port")
+    export_group.add_argument("--pg_user", dest="pg_user", type=str,
+                              required=True, help="PostgreSQL user")
+    export_group.add_argument("--pg_password", dest="pg_password", type=str,
+                              required=True, help="PostgreSQL password")
+    export_group.add_argument("--concave", dest="concave", type=int,
+                              help="Target percent of area for concave hull. Integers between 0 and 100."\
+                                    "When set to 100, area is equal to convex hull")
+    export_group.add_argument("--temp_dir", dest="temp_dir", type=str,
+                              required=True, help="Temp directory")
+    export_group.add_argument("--overwrite", dest="overwrite", action='store_true',
+                              help="Overwrite existing table")
+
+    # Main parser
+    parser = ArgumentParser()
+    subparsers = parser.add_subparsers(help='sub-command help')
+    parser.add_argument("--data", dest="data", type=str, default=None,
+                              help="Combine all options in a single JSON blob (mutually explusive to all other options)")
+
+    # Subparser INFO
+    parser_info = subparsers.add_parser('info', parents=[service_parser], help='Print cluster service info')
+    parser_info.set_defaults(func=_print_info)
+
+    # Subparser RUN
+    parser_run = subparsers.add_parser('run', parents=[service_parser, save_parser], help='Run cluster service and save to CSV')
+    parser_run.set_defaults(func=_run)
+
+    # Subparser EXPORT
+    parser_export = subparsers.add_parser('export', parents=[service_parser, export_parser], help='Run cluster service and export results to selected format')
+    parser_export.set_defaults(func=_export)
+
+    args = parser.parse_args()
     args.func(args)
 
 
 def _run(args):
-    if args.run_type=="run":
-        _run_service(args)
-    elif args.run_type=="info":
-        _print_info(args)
-    else:
-        print("ERROR: {} is not a valid run-type. valid types: [info, run]")
+    service = _run_service(args)
+    _save_service(service, args)
 
 
 def _run_service(args):
@@ -929,15 +1041,70 @@ def _run_service(args):
     print("\tTOTAL COUNT: {}".format(count))
     print("\tTOTAL AREA: {}".format(area))
     print("\tDATES: {} to {}".format(min_date,max_date))
+    return service
+
+
+def _save_service(service, args):
+
+    if args.data:
+        kwargs = json.loads(args.data)
+    else:
+        kwargs = copy.deepcopy(vars(args))
+
+    arg_spec = inspect.getargspec(ClusterService.save)
+
+    service = _run_service(args)
+
+    for key in kwargs.keys():
+        if key not in arg_spec[0]:
+            kwargs.pop(key)
+        elif not kwargs[key] or (isinstance(kwargs[key], dict) and len(arg_spec[key] == 0)):
+            kwargs.pop(key)
+
     print("SAVE: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-    service.save()
+    service.save(**kwargs)
     print("\tfilename: {}".format(service.name()))
     print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
 
+def _export(args):
+    if args.data:
+        kwargs = json.loads(args.data)
+    else:
+        kwargs = copy.deepcopy(vars(args))
+    arg_spec = inspect.getargspec(ClusterService.export)
+
+    service = _run_service(args)
+
+    for key in kwargs.keys():
+        if key not in arg_spec[0]:
+            kwargs.pop(key)
+        elif not kwargs[key] or (isinstance(kwargs[key], dict) and len(arg_spec[key] == 0)):
+            kwargs.pop(key)
+
+    print("EXPORT: {}".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+    pg_table = service.export(**kwargs)
+    print("\tpg_table: {}".format(pg_table))
+    print("COMPLETE: {}\n\n".format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+
+
 def _print_info(args,return_service=False):
-    kwargs=json.loads(args.data)
-    service=ClusterService(**kwargs)
+
+    arg_spec = inspect.getargspec(ClusterService.__init__)
+
+    if args.data:
+        kwargs = json.loads(args.data)
+    else:
+        kwargs = copy.deepcopy(vars(args))
+
+    for key in kwargs.keys():
+        if key not in arg_spec[0]:
+            kwargs.pop(key)
+        elif not kwargs[key] or (isinstance(kwargs[key], dict) and len(kwargs[key] == 0)):
+            kwargs.pop(key)
+
+    service = ClusterService(**kwargs)
+
     print("\n\nClusterService:")
     print("\trequest_size:",service.request_size())
     print("\tbounds:",service.bounds())
@@ -951,7 +1118,7 @@ def _print_info(args,return_service=False):
         print("\n")
 
 
-if __name__ == "__main__": 
+if __name__ == "__main__":
     main()
 
 
