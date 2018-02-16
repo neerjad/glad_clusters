@@ -1007,6 +1007,8 @@ def main():
     # Main parser
     parser = ArgumentParser()
     subparsers = parser.add_subparsers(help='sub-command help')
+    export_group.add_argument("--data", dest="data", type=str, default=None,
+                              help="Combine all options in a single JSON blob (mutually explusive to all other options)")
 
     # Subparser INFO
     parser_info = subparsers.add_parser('info', parents=[service_parser], help='Print cluster service info')
@@ -1044,7 +1046,11 @@ def _run_service(args):
 
 def _save_service(service, args):
 
-    kwargs = copy.deepcopy(vars(args))
+    if args.data:
+        kwargs = json.loads(args.data)
+    else:
+        kwargs = copy.deepcopy(vars(args))
+
     arg_spec = inspect.getargspec(ClusterService.save)
 
     service = _run_service(args)
@@ -1062,8 +1068,10 @@ def _save_service(service, args):
 
 
 def _export(args):
-
-    kwargs = copy.deepcopy(vars(args))
+    if args.data:
+        kwargs = json.loads(args.data)
+    else:
+        kwargs = copy.deepcopy(vars(args))
     arg_spec = inspect.getargspec(ClusterService.export)
 
     service = _run_service(args)
@@ -1084,7 +1092,10 @@ def _print_info(args,return_service=False):
 
     arg_spec = inspect.getargspec(ClusterService.__init__)
 
-    kwargs = copy.deepcopy(vars(args))
+    if args.data:
+        kwargs = json.loads(args.data)
+    else:
+        kwargs = copy.deepcopy(vars(args))
 
     for key in kwargs.keys():
         if key not in arg_spec[0]:
