@@ -1007,7 +1007,7 @@ def main():
     # Main parser
     parser = ArgumentParser()
     subparsers = parser.add_subparsers(help='sub-command help')
-    export_group.add_argument("--data", dest="data", type=str, default=None,
+    parser.add_argument("--data", dest="data", type=str, default=None,
                               help="Combine all options in a single JSON blob (mutually explusive to all other options)")
 
     # Subparser INFO
