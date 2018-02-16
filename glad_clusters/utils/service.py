@@ -554,7 +554,7 @@ class ClusterService(object):
                     WHERE "index" = id;
 
                     UPDATE {0}
-                    SET concave = ST_ConcaveHull (multipoint, {2});
+                    SET concave = ST_ConcaveHull(ST_Force2D(multipoint), {2});
                 """.format(pg_table, filename, concave/100)
 
             # execute SQL and close connection
