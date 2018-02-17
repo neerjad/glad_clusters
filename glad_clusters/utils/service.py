@@ -14,7 +14,6 @@ from glad_clusters.clusters.convex_hull import ConvexHull
 import inspect
 from argparse import ArgumentParser
 import copy
-import stat
 import glad_clusters.utils.sql as sql
 from glad_clusters.utils.parsers import service_parser
 from glad_clusters.utils.parsers import save_parser
