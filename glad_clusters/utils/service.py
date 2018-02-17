@@ -15,6 +15,8 @@ import inspect
 import argparse
 from argparse import ArgumentParser
 import copy
+import glad_clusters.utils.sql as sql
+
 
 
 CSV_ACL='public-read'
@@ -391,10 +393,11 @@ class ClusterService(object):
         self._dataframe['alerts']=self._dataframe['alerts'].apply(lambda a: np.array(a))
 
     def export(self,
-               ident=DEFAULT_CSV_IDENT,
                format="PG",
+               ident=DEFAULT_CSV_IDENT,
                temp_dir=None,
                pg_table=None,
+               pg_schema='public',
                pg_dbname=None,
                pg_host="localhost",
                pg_port=5432,
@@ -403,26 +406,27 @@ class ClusterService(object):
                concave=100,
                overwrite=False
                ):
-        """ write responses to csv
+        """ Export response to selected format
 
             Args:
 
                 Use one of the following:
 
-
-                    ident<str[DEFAULT_CSV_IDENT]>: prefix to default_name
+                    format<str(PG)>: Export format
+                    ident<str[DEFAULT_CSV_IDENT]>: Prefix to default_name
                     temp_dir<str>: Temporary folder for CSV export
                     pg_table<str>: PG table name
-                    pg_conn<dict>: PostgreSQL connection with the following keys
-                        dbname<string>: Database name.
-                        port<integer>: Port.
-                        user<string>: User name.
-                        password<string>: Password.
-                        host<string>: Server hostname.
+                    pg_schema<str{public)>: PG working schema
+                    pg_dbname<str>: Database name.
+                    pg_port<integer>: Port.
+                    pg_user<str>: User name.
+                    pg_password<str>: Password.
+                    pg_host<str>: Server hostname.
 
                 Other arguments:
 
                     overwrite<bool[False]>: if true write overwrite existing data
+                    concave<int(100)>: Percentage of convex area
 
         """
 
@@ -448,127 +452,31 @@ class ClusterService(object):
                 pg_table = os.path.basename(filename)
 
             conn = psycopg2.connect(database=pg_dbname, user=pg_user, password=pg_password, host=pg_host, port=pg_port)
+
+            # check if pg_table already exists.
+            # If yes delete all data, otherwise create table
+            exists = sql.table_exists(conn, pg_schema, pg_table)
+
             cur = conn.cursor()
 
-            exists = False
-            try:
-                cur.execute("SELECT * FROM {} LIMIT 1;".format(pg_table))
-                exists = True
-            except:
-                # make a commit here to avoid internal errors down the line
-                conn.commit()
-
             if overwrite and exists:
-                cur.execute("DELETE FROM {};".format(pg_table))
-
+                sql.delete_data(cur, pg_schema, pg_table)
             elif not exists:
-                sql = """
-                    CREATE TABLE {0}
-                    (
-                      index integer NOT NULL,
-                      count integer,
-                      area integer,
-                      min_date integer,
-                      max_date integer,
-                      longitude double precision,
-                      latitude double precision,
-                      z integer,
-                      x integer,
-                      y integer,
-                      i integer,
-                      j integer,
-                      file_name text,
-                      "timestamp" text,
-                      alerts integer[],
-                      CONSTRAINT {0}_pkey PRIMARY KEY (index)
-                    )
-                    WITH (
-                      OIDS=FALSE
-                    );
-                    
-                    SELECT AddGeometryColumn('{0}', 'multipoint', 4326, 'MULTIPOINT', 3);
-                    SELECT AddGeometryColumn('{0}', 'concave', 4326, 'POLYGON', 2);
-
-                    CREATE INDEX {0}_index_idx
-                      ON {0}
-                      USING btree
-                      (index);
-
-                    CREATE INDEX {0}_multipoint_idx
-                      ON {0}
-                      USING gist
-                      (multipoint);
-
-                    CREATE INDEX {0}_concave_idx
-                      ON {0}
-                      USING gist
-                      (concave);
-                    """.format(pg_table)
-
-                cur.execute(sql)
-
+                sql.create_schema(cur, pg_schema)
+                sql.create_table(cur, pg_schema, pg_table)
             else:
                 raise Exception('PG table already exist and overwrite set to false.')
 
-            sql = """
-                    CREATE OR REPLACE FUNCTION unnest_2d_1d(anyarray)
-                      RETURNS SETOF anyarray AS
-                    $BODY$
-                    SELECT array_agg($1[d1][d2])
-                    FROM   generate_subscripts($1,1) d1
-                        ,  generate_subscripts($1,2) d2
-                    GROUP  BY d1
-                    ORDER  BY d1
-                    $BODY$
-                      LANGUAGE sql IMMUTABLE
-                      COST 100
-                      ROWS 1000;
+            # Load the data
+            sql.load_data(cur, pg_schema, pg_table, filename, concave)
 
-                    CREATE OR REPLACE FUNCTION sinh(x numeric)
-                      RETURNS double precision AS
-                    $BODY$
-                            BEGIN
-                                    RETURN (exp(x) - exp(-x))/2;
-                            END;
-                    $BODY$
-                      LANGUAGE plpgsql VOLATILE
-                      COST 100;
-
-                    COPY {0}(index,count,area,min_date,max_date,longitude,latitude,z,x,y,i,j,file_name,timestamp,alerts) 
-                    FROM '{1}' DELIMITER ',' CSV HEADER;
-
-                    WITH t AS (SELECT "index" AS id, z, x, y, unnest_2d_1d(alerts) AS alerts FROM {0})
-                    UPDATE {0}
-                    SET multipoint = g.multipoint
-                    FROM
-                    (SELECT 
-                        id, 
-                        st_collect(
-                        ST_SetSRID(ST_MakePoint(
-                            (360.0/(2^z))*(x+(alerts[2]/256.0))-180.0,
-                            (atan(sinh((pi()*(1-(2*(y+(alerts[1]/256.0))/(2^z))))::numeric))*180.0)/pi(),
-                            alerts[3]),
-                        4326)) AS multipoint
-                    FROM t
-                    GROUP BY id) AS g
-                    WHERE "index" = id;
-
-                    UPDATE {0}
-                    SET concave = ST_ConcaveHull(ST_Force2D(multipoint), {2});
-                """.format(pg_table, filename, concave/100)
-
-            # execute SQL and close connection
-            cur.execute(sql)
+            # Close connection and clean up
             conn.commit()
             cur.close()
             conn.close()
 
-            # delete temp file
             os.remove(filename)
-
             self._dataframe['alerts'] = self._dataframe['alerts'].apply(lambda a: np.array(a))
-
-            # print("Data successfully exported to table {}".format(pg_table))
 
         else:
             raise Exception('Unsupported format.')
@@ -986,6 +894,8 @@ def main():
                                help="Export format (default PG)", default="PG")
     export_group.add_argument("--pg_table", dest="pg_table", type=str,
                                help="PostgreSQL table name")
+    export_group.add_argument("--pg_schema", dest="pg_schema", type=str,
+                              help="PostgreSQL schema name")
     export_group.add_argument("--pg_dbname", dest="pg_dbname", type=str,
                                required=True, help="PostgreSQL database name")
     export_group.add_argument("--pg_host", dest="pg_host", type=str,
