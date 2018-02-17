@@ -301,6 +301,8 @@ Export settings:
   --pg_table PG_TABLE   PostgreSQL table name
   --pg_dbname PG_DBNAME
                         PostgreSQL database name
+  --pg_schema PG_SCHEMA
+                        PostgreSQL schema name
   --pg_host PG_HOST     PostgreSQL host
   --pg_port PG_PORT     PostgreSQL port
   --pg_user PG_USER     PostgreSQL user
@@ -309,7 +311,8 @@ Export settings:
   --concave CONCAVE     Target percent of area for concave hull. Integers
                         between 0 and 100.When set to 100, area is equal to
                         convex hull
-  --temp_dir TEMP_DIR   Temp directory
+  --temp_dir TEMP_DIR   Temp directory. Make sure this directory is accessible
+                        for postgres user
   --overwrite           Overwrite existing table
 ```
 
