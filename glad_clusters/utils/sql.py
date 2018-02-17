@@ -21,7 +21,7 @@ def table_exists(conn, pg_schema, pg_table):
     return exists
 
 
-def create_schema(cur, pg_schema, commit=False):
+def create_schema(cur, pg_schema, conn=None):
     """ Create working schema in PostgreSQL database
 
         Args:
@@ -32,13 +32,13 @@ def create_schema(cur, pg_schema, commit=False):
     sql = "CREATE SCHEMA IF NOT EXISTS {}".format(pg_schema)
     cur.execute(sql)
 
-    if commit:
-        cur.commit()
+    if conn:
+        conn.commit()
 
     return
 
 
-def create_table(cur, pg_schema, pg_table, commit=False):
+def create_table(cur, pg_schema, pg_table, conn=None):
     """ Create export table in PostgreSQL database
 
         Args:
@@ -90,13 +90,13 @@ def create_table(cur, pg_schema, pg_table, commit=False):
     """.format(pg_schema, pg_table)
     cur.execute(sql)
 
-    if commit:
-        cur.commit()
+    if conn:
+        conn.commit()
 
     return
 
 
-def delete_data(cur, pg_schema, pg_table, commit=False):
+def delete_data(cur, pg_schema, pg_table, conn=None):
     """ Delete all data from selected export table in PostgreSQL database
 
         Args:
@@ -107,12 +107,13 @@ def delete_data(cur, pg_schema, pg_table, commit=False):
     sql = "DELETE FROM {0}.{1};".format(pg_schema, pg_table)
     cur.execute(sql)
 
-    if commit:
-        cur.commit()
+    if conn:
+        conn.commit()
 
     return
 
-def load_data(cur, pg_schema, pg_table, filename, concave, commit=False):
+
+def load_data(cur, pg_schema, pg_table, filename, concave, conn=None):
     """
     Load data from into selected export table in PostgreSQL database.
     Make sure required functions exist and update geometries
@@ -129,12 +130,13 @@ def load_data(cur, pg_schema, pg_table, filename, concave, commit=False):
     _update_multipoint(cur, pg_schema, pg_table)
     _update_concave(cur, pg_schema, pg_table, concave)
 
-    if commit:
-        cur.commit()
+    if conn:
+        conn.commit()
+
     return
 
 
-def _unnest_2d_1d(cur, commit=False):
+def _unnest_2d_1d(cur, conn=None):
     sql = """
     CREATE OR REPLACE FUNCTION unnest_2d_1d(anyarray)
         RETURNS SETOF anyarray AS
@@ -151,13 +153,13 @@ def _unnest_2d_1d(cur, commit=False):
     """
     cur.execute(sql)
 
-    if commit:
-        cur.commit()
+    if conn:
+        conn.commit()
 
     return
 
 
-def _sinh(cur, commit=False):
+def _sinh(cur, conn=None):
     sql = """
     CREATE OR REPLACE FUNCTION sinh(x numeric)
         RETURNS double precision AS
@@ -171,26 +173,26 @@ def _sinh(cur, commit=False):
     """
     cur.execute(sql)
 
-    if commit:
-        cur.commit()
+    if conn:
+        conn.commit()
 
     return
 
 
-def _load_csv(cur, pg_schema, pg_table, filename, commit=False):
+def _load_csv(cur, pg_schema, pg_table, filename, conn=None):
     sql = """
     COPY {0}.{1}(index,count,area,min_date,max_date,longitude,latitude,z,x,y,i,j,file_name,timestamp,alerts) 
         FROM '{2}' DELIMITER ',' CSV HEADER;
     """.format(pg_schema, pg_table, filename)
     cur.execute(sql)
 
-    if commit:
-        cur.commit()
+    if conn:
+        conn.commit()
 
     return
 
 
-def _update_multipoint(cur, pg_schema, pg_table, commit=False):
+def _update_multipoint(cur, pg_schema, pg_table, conn=None):
     sql = """
         WITH t AS (SELECT "index" AS id, z, x, y, unnest_2d_1d(alerts) AS alerts FROM {0}.{1})
         UPDATE {0}.{1}
@@ -210,20 +212,20 @@ def _update_multipoint(cur, pg_schema, pg_table, commit=False):
     """.format(pg_schema, pg_table)
     cur.execute(sql)
 
-    if commit:
-        cur.commit()
+    if conn:
+        conn.commit()
 
     return
 
 
-def _update_concave(cur, pg_schema, pg_table, concave, commit=False):
+def _update_concave(cur, pg_schema, pg_table, concave, conn=None):
     sql = """
     UPDATE {0}.{1}
         SET concave = ST_ConcaveHull(ST_Force2D(multipoint), {2});
     """.format(pg_schema, pg_table, concave/100)
     cur.execute(sql)
 
-    if commit:
-        cur.commit()
+    if conn:
+        conn.commit()
 
     return
