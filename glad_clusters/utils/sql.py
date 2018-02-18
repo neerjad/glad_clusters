@@ -1,7 +1,7 @@
 import psycopg2
 
 
-def table_exists(conn, pg_schema, pg_table):
+def table_exists(conn, pg_schema, pg_table, commit=False):
     """ Check if a table exists
 
         Args:
@@ -15,13 +15,15 @@ def table_exists(conn, pg_schema, pg_table):
         exists = True
     except psycopg2.ProgrammingError:
         exists = False
-    conn.commit()
     cur.close()
+
+    if commit:
+        conn.commit()
 
     return exists
 
 
-def create_schema(cur, pg_schema, conn=None):
+def create_schema(conn, pg_schema, commit=False):
     """ Create working schema in PostgreSQL database
 
         Args:
@@ -29,16 +31,18 @@ def create_schema(cur, pg_schema, conn=None):
             pg_schema<string>: Schema name
             commit<boolean(False)>: Make commit after statement
     """
+    cur = conn.cursor()
     sql = "CREATE SCHEMA IF NOT EXISTS {}".format(pg_schema)
     cur.execute(sql)
 
-    if conn:
-        conn.commit()
+    cur.close()
 
+    if commit:
+        conn.commit()
     return
 
 
-def create_table(cur, pg_schema, pg_table, conn=None):
+def create_table(conn, pg_schema, pg_table, commit=False):
     """ Create export table in PostgreSQL database
 
         Args:
@@ -46,6 +50,7 @@ def create_table(cur, pg_schema, pg_table, conn=None):
             pg_table<string>: Table name
             commit<boolean(False)>: Make commit after statement
     """
+    cur = conn.cursor()
     sql = """
             CREATE TABLE {0}.{1}
                 (
@@ -90,13 +95,15 @@ def create_table(cur, pg_schema, pg_table, conn=None):
     """.format(pg_schema, pg_table)
     cur.execute(sql)
 
-    if conn:
+    cur.close()
+
+    if commit:
         conn.commit()
 
     return
 
 
-def delete_data(cur, pg_schema, pg_table, conn=None):
+def delete_data(conn, pg_schema, pg_table, commit=False):
     """ Delete all data from selected export table in PostgreSQL database
 
         Args:
@@ -104,16 +111,19 @@ def delete_data(cur, pg_schema, pg_table, conn=None):
             pg_table<string>: Table name
             commit<boolean(False)>: Make commit after statement
     """
+    cur = conn.cursor()
     sql = "DELETE FROM {0}.{1};".format(pg_schema, pg_table)
     cur.execute(sql)
 
-    if conn:
+    cur.close()
+
+    if commit:
         conn.commit()
 
     return
 
 
-def load_data(cur, pg_schema, pg_table, filename, concave, conn=None):
+def load_data(conn, pg_schema, pg_table, filename, concave, commit=False):
     """
     Load data from into selected export table in PostgreSQL database.
     Make sure required functions exist and update geometries
@@ -124,19 +134,21 @@ def load_data(cur, pg_schema, pg_table, filename, concave, conn=None):
             filename<string>: path and filename of CSV file
             commit<boolean(False)>: Make commit after statement
     """
-    _unnest_2d_1d(cur)
-    _sinh(cur)
-    _load_csv(cur, pg_schema, pg_table, filename)
-    _update_multipoint(cur, pg_schema, pg_table)
-    _update_concave(cur, pg_schema, pg_table, concave)
+    _unnest_2d_1d(conn)
+    _sinh(conn)
+    _load_csv(conn, pg_schema, pg_table, filename)
+    _update_multipoint(conn, pg_schema, pg_table)
+    _update_concave(conn, pg_schema, pg_table, concave)
 
-    if conn:
+    if commit:
         conn.commit()
 
     return
 
 
-def _unnest_2d_1d(cur, conn=None):
+def _unnest_2d_1d(conn, commit=False):
+
+    cur = conn.cursor()
     sql = """
     CREATE OR REPLACE FUNCTION unnest_2d_1d(anyarray)
         RETURNS SETOF anyarray AS
@@ -153,13 +165,18 @@ def _unnest_2d_1d(cur, conn=None):
     """
     cur.execute(sql)
 
-    if conn:
+    cur.close()
+
+    if commit:
         conn.commit()
 
     return
 
 
-def _sinh(cur, conn=None):
+def _sinh(conn, commit=False):
+
+    cur = conn.cursor()
+
     sql = """
     CREATE OR REPLACE FUNCTION sinh(x numeric)
         RETURNS double precision AS
@@ -173,26 +190,35 @@ def _sinh(cur, conn=None):
     """
     cur.execute(sql)
 
-    if conn:
-        conn.commit()
+    cur.close()
 
+    if commit:
+        conn.commit()
     return
 
 
-def _load_csv(cur, pg_schema, pg_table, filename, conn=None):
+def _load_csv(conn, pg_schema, pg_table, filename, commit=False):
+
+    cur = conn.cursor()
+
     sql = """
     COPY {0}.{1}(index,count,area,min_date,max_date,longitude,latitude,z,x,y,i,j,file_name,timestamp,alerts) 
         FROM '{2}' DELIMITER ',' CSV HEADER;
     """.format(pg_schema, pg_table, filename)
     cur.execute(sql)
 
-    if conn:
+    cur.close()
+
+    if commit:
         conn.commit()
 
     return
 
 
-def _update_multipoint(cur, pg_schema, pg_table, conn=None):
+def _update_multipoint(conn, pg_schema, pg_table, commit=False):
+
+    cur = conn.cursor()
+
     sql = """
         WITH t AS (SELECT "index" AS id, z, x, y, unnest_2d_1d(alerts) AS alerts FROM {0}.{1})
         UPDATE {0}.{1}
@@ -212,20 +238,26 @@ def _update_multipoint(cur, pg_schema, pg_table, conn=None):
     """.format(pg_schema, pg_table)
     cur.execute(sql)
 
-    if conn:
-        conn.commit()
+    cur.close()
 
+    if commit:
+        conn.commit()
     return
 
 
-def _update_concave(cur, pg_schema, pg_table, concave, conn=None):
+def _update_concave(conn, pg_schema, pg_table, concave, commit=False):
+
+    cur = conn.cursor()
+
     sql = """
     UPDATE {0}.{1}
         SET concave = ST_ConcaveHull(ST_Force2D(multipoint), {2});
     """.format(pg_schema, pg_table, concave/100)
     cur.execute(sql)
 
-    if conn:
+    cur.close()
+
+    if commit:
         conn.commit()
 
     return

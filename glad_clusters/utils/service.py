@@ -459,24 +459,21 @@ class ClusterService(object):
 
             # check if pg_table already exists.
             # If yes delete all data, otherwise create table
-            exists = sql.table_exists(conn, pg_schema, pg_table)
-
-            cur = conn.cursor()
+            exists = sql.table_exists(conn, pg_schema, pg_table, True)
 
             if overwrite and exists:
-                sql.delete_data(cur, pg_schema, pg_table)
+                sql.delete_data(conn, pg_schema, pg_table)
             elif not exists:
-                sql.create_schema(cur, pg_schema)
-                sql.create_table(cur, pg_schema, pg_table)
+                sql.create_schema(conn, pg_schema)
+                sql.create_table(conn, pg_schema, pg_table)
             else:
                 raise Exception('PG table already exist and overwrite set to false.')
 
             # Load the data
-            sql.load_data(cur, pg_schema, pg_table, filename, concave)
+            sql.load_data(conn, pg_schema, pg_table, filename, concave)
 
             # Close connection and clean up
             conn.commit()
-            cur.close()
             conn.close()
 
             os.remove(filename)
